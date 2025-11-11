@@ -143,6 +143,7 @@ const api = {
     const response = await axios.get(`${API_URL}/audit-log`, { params });
     return response.data;
   },
+  
 
   // =============================
   // 🧪 SIMULADOR (modo DEV)
@@ -155,6 +156,57 @@ const api = {
     });
     return response.data;
   },
+  // =============================
+  // 🏷️ TAGS
+  // =============================
+  getAllTags: async () => {
+    const response = await axios.get(`${API_URL}/tags`);
+    return response.data;
+  },
+
+  getLeadTags: async (leadId) => {
+    const response = await axios.get(`${API_URL}/leads/${leadId}/tags`);
+    return response.data;
+  },
+
+  addTagToLead: async (leadId, tagId) => {
+    const response = await axios.post(`${API_URL}/leads/${leadId}/tags`, { 
+      tag_id: tagId 
+    });
+    return response.data;
+  },
+
+  removeTagFromLead: async (leadId, tagId) => {
+    const response = await axios.delete(`${API_URL}/leads/${leadId}/tags/${tagId}`);
+    return response.data;
+  },
+
+  createTag: async (tagData) => {
+    const response = await axios.post(`${API_URL}/tags`, tagData);
+    return response.data;
+  },
+
+  // =============================
+  // ⏱️ SLA
+  // =============================
+  getLeadSLA: async (leadId) => {
+    const response = await axios.get(`${API_URL}/leads/${leadId}/sla`);
+    return response.data;
+  },
+
+  getSLAMetrics: async () => {
+    const response = await axios.get(`${API_URL}/sla/metrics`);
+    return response.data;
+  },
+
+  getSLAAlerts: async (threshold = 5) => {
+    const response = await axios.get(`${API_URL}/sla/alerts`, {
+      params: { threshold }
+    });
+    return response.data;
+  },
 };
+
+
 
 export default api;

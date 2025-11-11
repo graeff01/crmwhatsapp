@@ -1,0 +1,234 @@
+/* === MODAL POPUP CENTRAL === */
+.lead-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+}
+
+.lead-modal-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 800px;
+  max-height: 85vh;
+  background: #111b21;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  overflow-y: auto;
+  z-index: 100;
+  animation: modalFadeIn 0.25s ease;
+  color: #e9edef;
+}
+
+/* Cabeçalho */
+.lead-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  background: #1f2c33;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+}
+
+.lead-modal-header h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.lead-modal-close {
+  background: none;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.lead-modal-close:hover {
+  color: #fff;
+  transform: scale(1.1);
+}
+
+/* Conteúdo */
+.lead-modal-content {
+  padding: 20px 28px;
+  overflow-y: auto;
+}
+
+/* Seções */
+.lead-modal-section {
+  margin-bottom: 24px;
+}
+.lead-modal-section h3 {
+  font-size: 0.95rem;
+  color: #00a884;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding-bottom: 6px;
+}
+
+/* Grid de informações */
+.lead-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.lead-info-item {
+  background: #1a242c;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+}
+.lead-info-label {
+  display: block;
+  color: #8696a0;
+  font-size: 0.8rem;
+}
+.lead-info-value {
+  font-weight: 500;
+  color: #e9edef;
+}
+
+/* Tags */
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.btn-add-tag {
+  background: #00a884;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.btn-add-tag:hover {
+  background: #02c295;
+}
+
+/* Mensagens */
+.messages-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  background: #0b141a;
+  border-radius: 8px;
+  padding: 10px;
+}
+.message-item {
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #1f2c33;
+  font-size: 0.85rem;
+}
+.message-item.from-vendedor {
+  align-self: flex-end;
+  background: #005c4b;
+  color: #fff;
+}
+.message-item.from-lead {
+  align-self: flex-start;
+  background: #1f2c33;
+}
+.message-time {
+  text-align: right;
+  font-size: 0.7rem;
+  color: #8696a0;
+  margin-top: 3px;
+}
+
+/* Timeline limpa */
+.lead-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #0b141a;
+  padding: 10px;
+  border-radius: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.timeline-item {
+  background: #1a232b;
+  border-radius: 6px;
+  padding: 8px 10px;
+  border-left: 3px solid #00a884;
+}
+.timeline-action {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.timeline-details {
+  font-size: 0.8rem;
+  color: #b0b0b0;
+}
+.timeline-time {
+  font-size: 0.75rem;
+  color: #8696a0;
+  text-align: right;
+}
+
+/* Rodapé */
+.lead-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  background: #1f2c33;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+}
+.lead-modal-btn {
+  flex: 1;
+  margin: 0 5px;
+  padding: 10px 0;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-success {
+  background: #00a884;
+  color: white;
+}
+.btn-success:hover {
+  background: #02c295;
+}
+.btn-danger {
+  background: #e14a4a;
+  color: white;
+}
+.btn-danger:hover {
+  background: #ff5c5c;
+}
+.btn-primary {
+  background: #007bff;
+  color: white;
+}
+.btn-primary:hover {
+  background: #3399ff;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}

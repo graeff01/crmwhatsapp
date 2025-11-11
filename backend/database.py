@@ -7,8 +7,13 @@ class Database:
         self.init_db()
 
     def get_connection(self):
-        return sqlite3.connect(self.db_name)
+        conn = sqlite3.connect(self.db_name)
+        conn.row_factory = sqlite3.Row  # ← permite acessar colunas por nome
+        return conn
 
+    # =======================
+    # INICIALIZAÇÃO
+    # =======================
     def init_db(self):
         conn = self.get_connection()
         c = conn.cursor()
@@ -97,6 +102,9 @@ class Database:
 
         conn.close()
 
+    # =======================
+    # USUÁRIOS
+    # =======================
     def hash_password(self, password):
         return hashlib.sha256(password.encode()).hexdigest()
 
@@ -106,16 +114,18 @@ class Database:
         c.execute("SELECT * FROM users WHERE username = ? AND active = 1", (username,))
         user = c.fetchone()
         conn.close()
-        if user and user[2] == self.hash_password(password):
-            return {"id": user[0], "username": user[1], "password": user[2], "name": user[3], "role": user[4], "active": user[5]}
+        if user and user["password"] == self.hash_password(password):
+            return dict(user)
         return None
 
     def create_user(self, username, password, name, role):
         try:
             conn = self.get_connection()
             c = conn.cursor()
-            c.execute("INSERT INTO users (username, password, name, role) VALUES (?, ?, ?, ?)",
-                     (username, self.hash_password(password), name, role))
+            c.execute("""
+                INSERT INTO users (username, password, name, role)
+                VALUES (?, ?, ?, ?)
+            """, (username, self.hash_password(password), name, role))
             conn.commit()
             uid = c.lastrowid
             conn.close()
@@ -127,7 +137,7 @@ class Database:
         conn = self.get_connection()
         c = conn.cursor()
         c.execute("SELECT id, username, name, role, active FROM users")
-        users = [{"id": r[0], "username": r[1], "name": r[2], "role": r[3], "active": r[4]} for r in c.fetchall()]
+        users = [dict(r) for r in c.fetchall()]
         conn.close()
         return users
 
@@ -145,61 +155,120 @@ class Database:
         conn.commit()
         conn.close()
 
-    def create_or_get_lead(self, phone, name):
+    def change_user_password(self, user_id, new_password):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT id, name, phone FROM leads WHERE phone = ?", (phone,))
-        lead = c.fetchone()
-        if lead:
-            conn.close()
-            return {"id": lead[0], "name": lead[1], "phone": lead[2]}
-        c.execute("INSERT INTO leads (name, phone, status) VALUES (?, ?, 'novo')", (name, phone))
-        lead_id = c.lastrowid
+        c.execute("UPDATE users SET password = ? WHERE id = ?", (self.hash_password(new_password), user_id))
         conn.commit()
         conn.close()
-        return {"id": lead_id, "name": name, "phone": phone}
+
+    # =======================
+    # LEADS
+    # =======================
+    def create_or_get_lead(self, phone, name="Lead Desconhecido"):
+        """Cria lead se não existir, ou retorna existente"""
+        try:
+            conn = self.get_connection()
+            c = conn.cursor()
+            phone = str(phone).replace("+", "").replace(" ", "").replace("-", "").replace("@c.us", "")
+
+            # Verifica se já existe
+            c.execute("SELECT * FROM leads WHERE phone = ?", (phone,))
+            lead = c.fetchone()
+            if lead:
+                print(f"ℹ️ Lead existente encontrado: {lead['name']} ({phone})")
+                conn.close()
+                return dict(lead)
+
+            # Cria novo lead
+            c.execute("""
+                INSERT INTO leads (name, phone, status, created_at)
+                VALUES (?, ?, 'novo', datetime('now'))
+            """, (name, phone))
+            conn.commit()
+
+            c.execute("SELECT * FROM leads WHERE phone = ?", (phone,))
+            new_lead = c.fetchone()
+            conn.close()
+            print(f"🆕 Lead criado: {name} ({phone})")
+            return dict(new_lead)
+
+        except Exception as e:
+            print(f"❌ Erro ao criar/obter lead: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def get_lead(self, lead_id):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT id, name, phone, status, assigned_to FROM leads WHERE id = ?", (lead_id,))
+        c.execute("SELECT * FROM leads WHERE id = ?", (lead_id,))
         r = c.fetchone()
         conn.close()
-        if r:
-            return {"id": r[0], "name": r[1], "phone": r[2], "status": r[3], "assigned_to": r[4]}
-        return None
+        return dict(r) if r else None
+
+    def get_lead_by_phone(self, phone):
+        """Busca lead por número de telefone"""
+        try:
+            # Normaliza o telefone
+            phone_clean = str(phone).replace("+", "").replace(" ", "").replace("-", "").replace("@c.us", "")
+            
+            conn = self.get_connection()
+            c = conn.cursor()
+            c.execute("SELECT * FROM leads WHERE phone = ?", (phone_clean,))
+            lead = c.fetchone()
+            conn.close()
+            
+            if lead:
+                return dict(lead)
+            return None
+            
+        except Exception as e:
+            print(f"❌ Erro ao buscar lead por telefone: {e}")
+            return None
 
     def get_all_leads(self):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("""SELECT l.id, l.name, l.phone, l.status, l.assigned_to, u.name, l.updated_at
-                     FROM leads l LEFT JOIN users u ON l.assigned_to = u.id ORDER BY l.updated_at DESC""")
-        leads = [{"id": r[0], "name": r[1], "phone": r[2], "status": r[3], "assigned_to": r[4],
-                  "vendedor_name": r[5], "updated_at": r[6]} for r in c.fetchall()]
+        c.execute("""
+            SELECT l.*, u.name AS vendedor_name
+            FROM leads l LEFT JOIN users u ON l.assigned_to = u.id
+            ORDER BY l.updated_at DESC
+        """)
+        leads = [dict(r) for r in c.fetchall()]
         conn.close()
         return leads
 
-    def get_leads_by_vendedor(self, vendedor_id):
+    def get_leads_by_vendedor(self, user_id):
+        """Retorna leads atribuídos a um vendedor específico"""
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT id, name, phone, status, updated_at FROM leads WHERE assigned_to = ? ORDER BY updated_at DESC", (vendedor_id,))
-        leads = [{"id": r[0], "name": r[1], "phone": r[2], "status": r[3], "updated_at": r[4]} for r in c.fetchall()]
+        c.execute("""
+            SELECT l.*, u.name AS vendedor_name
+            FROM leads l LEFT JOIN users u ON l.assigned_to = u.id
+            WHERE l.assigned_to = ?
+            ORDER BY l.updated_at DESC
+        """, (user_id,))
+        leads = [dict(r) for r in c.fetchall()]
         conn.close()
         return leads
 
     def get_leads_by_status(self, status):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT id, name, phone, status, updated_at FROM leads WHERE status = ?", (status,))
-        leads = [{"id": r[0], "name": r[1], "phone": r[2], "status": r[3], "updated_at": r[4]} for r in c.fetchall()]
+        c.execute("SELECT * FROM leads WHERE status = ? ORDER BY updated_at DESC", (status,))
+        leads = [dict(r) for r in c.fetchall()]
         conn.close()
         return leads
 
     def assign_lead(self, lead_id, user_id):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("UPDATE leads SET assigned_to = ?, status = 'em_atendimento', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                 (user_id, lead_id))
+        c.execute("""
+            UPDATE leads
+            SET assigned_to = ?, status = 'em_atendimento', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (user_id, lead_id))
         conn.commit()
         conn.close()
 
@@ -210,30 +279,38 @@ class Database:
         conn.commit()
         conn.close()
 
-    def get_messages_by_lead(self, lead_id):
+    def transfer_lead(self, lead_id, new_user_id):
+        """Transfere lead para outro vendedor"""
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT id, sender_type, sender_name, content, timestamp FROM messages WHERE lead_id = ? ORDER BY id ASC", (lead_id,))
-        msgs = [{"id": r[0], "sender_type": r[1], "sender_name": r[2], "content": r[3], "timestamp": r[4]} for r in c.fetchall()]
-        conn.close()
-        return msgs
-
-    def add_message(self, lead_id, sender_type, sender_name, content):
-        conn = self.get_connection()
-        c = conn.cursor()
-        c.execute("INSERT INTO messages (lead_id, sender_type, sender_name, content) VALUES (?, ?, ?, ?)",
-                 (lead_id, sender_type, sender_name, content))
+        c.execute("""
+            UPDATE leads
+            SET assigned_to = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (new_user_id, lead_id))
         conn.commit()
         conn.close()
 
-    def get_internal_notes(self, lead_id):
+    # =======================
+    # MENSAGENS / LOGS / NOTAS
+    # =======================
+    def add_message(self, lead_id, sender_type, sender_name, content):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("""SELECT n.id, n.note, u.name, n.created_at FROM internal_notes n
-                     JOIN users u ON n.user_id = u.id WHERE n.lead_id = ? ORDER BY n.created_at DESC""", (lead_id,))
-        notes = [{"id": r[0], "note": r[1], "user_name": r[2], "created_at": r[3]} for r in c.fetchall()]
+        c.execute("""
+            INSERT INTO messages (lead_id, sender_type, sender_name, content)
+            VALUES (?, ?, ?, ?)
+        """, (lead_id, sender_type, sender_name, content))
+        conn.commit()
         conn.close()
-        return notes
+
+    def get_messages_by_lead(self, lead_id):
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM messages WHERE lead_id = ? ORDER BY id ASC", (lead_id,))
+        msgs = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return msgs
 
     def add_internal_note(self, lead_id, user_id, note):
         conn = self.get_connection()
@@ -242,22 +319,91 @@ class Database:
         conn.commit()
         conn.close()
 
+    def get_internal_notes(self, lead_id):
+        """Retorna notas internas de um lead"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT n.*, u.name as user_name
+            FROM internal_notes n
+            LEFT JOIN users u ON n.user_id = u.id
+            WHERE n.lead_id = ?
+            ORDER BY n.created_at DESC
+        """, (lead_id,))
+        notes = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return notes
+
     def add_lead_log(self, lead_id, action, user_name, details=""):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("INSERT INTO lead_logs (lead_id, action, user_name, details) VALUES (?, ?, ?, ?)",
-                 (lead_id, action, user_name, details))
+        c.execute("""
+            INSERT INTO lead_logs (lead_id, action, user_name, details)
+            VALUES (?, ?, ?, ?)
+        """, (lead_id, action, user_name, details))
         conn.commit()
         conn.close()
 
     def get_lead_logs(self, lead_id):
         conn = self.get_connection()
         c = conn.cursor()
-        c.execute("SELECT action, user_name, details, timestamp FROM lead_logs WHERE lead_id = ? ORDER BY id DESC", (lead_id,))
-        logs = [{"action": r[0], "user": r[1], "details": r[2], "timestamp": r[3]} for r in c.fetchall()]
+        c.execute("SELECT * FROM lead_logs WHERE lead_id = ? ORDER BY id DESC", (lead_id,))
+        logs = [dict(r) for r in c.fetchall()]
         conn.close()
         return logs
 
+    # =======================
+    # LOGS DE AUDITORIA
+    # =======================
+    def add_audit_log(self, user_id, action, entity_type, entity_id, details=""):
+        """Adiciona log de auditoria para rastreamento de ações"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO audit_log (user_id, action, entity_type, entity_id, details)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, action, entity_type, entity_id, details))
+        conn.commit()
+        conn.close()
+
+    def get_audit_logs(self, limit=100):
+        """Retorna logs de auditoria"""
+        conn = self.get_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT a.*, u.name as user_name
+            FROM audit_log a
+            LEFT JOIN users u ON a.user_id = u.id
+            ORDER BY a.timestamp DESC
+            LIMIT ?
+        """, (limit,))
+        logs = [dict(r) for r in c.fetchall()]
+        conn.close()
+        return logs
+
+    # =======================
+    # TAGS (para extensão)
+    # =======================
+    def get_lead_tags(self, lead_id):
+        """Retorna tags de um lead (se tabela existir)"""
+        try:
+            conn = self.get_connection()
+            c = conn.cursor()
+            c.execute("""
+                SELECT t.* FROM tags t
+                INNER JOIN lead_tags lt ON t.id = lt.tag_id
+                WHERE lt.lead_id = ?
+            """, (lead_id,))
+            tags = [dict(r) for r in c.fetchall()]
+            conn.close()
+            return tags
+        except sqlite3.OperationalError:
+            # Tabela de tags ainda não existe
+            return []
+
+    # =======================
+    # MÉTRICAS
+    # =======================
     def get_metrics_summary(self):
         conn = self.get_connection()
         c = conn.cursor()
@@ -269,6 +415,18 @@ class Database:
         perdidos = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM leads WHERE status = 'em_atendimento'")
         ativos = c.fetchone()[0]
-        funil = {"novo": total - ganhos - perdidos - ativos, "em_atendimento": ativos, "ganho": ganhos, "perdido": perdidos}
+
+        funil = {
+            "novo": total - ganhos - perdidos - ativos,
+            "em_atendimento": ativos,
+            "ganho": ganhos,
+            "perdido": perdidos
+        }
+
         conn.close()
-        return {"total_leads": total, "leads_ganhos": ganhos, "leads_perdidos": perdidos, "funil": funil}
+        return {
+            "total_leads": total,
+            "leads_ganhos": ganhos,
+            "leads_perdidos": perdidos,
+            "funil": funil
+        }

@@ -1,0 +1,182 @@
+const venom = require('venom-bot');
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+app.use(express.json());
+
+const WEBHOOK_URL = 'http://localhost:5000/api/webhook/message';
+
+console.log('⚙️ Iniciando VenomBot...');
+console.log(`📡 Webhook configurado para: ${WEBHOOK_URL}\n`);
+
+venom
+  .create({
+    session: 'veloce-crm',
+    headless: false,
+    useChrome: true,
+    logQR: true,
+    browserArgs: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--disable-gpu'
+    ]
+  })
+  .then((client) => {
+    console.log('✅ VenomBot inicializado com sucesso!');
+    console.log('🎯 VenomBot aguardando mensagens...\n');
+
+    // ============================
+    // RECEBER MENSAGENS
+    // ============================
+    client.onMessage(async (message) => {
+      try {
+        // Ignora mensagens enviadas pela própria empresa
+        if (message.fromMe) {
+          console.log('⏭️  Ignorando mensagem própria');
+          return;
+        }
+
+        console.log('\n📨 ===== NOVA MENSAGEM RECEBIDA =====');
+        console.log(`👤 De: ${message.from}`);
+        console.log(`📛 Nome: ${message.notifyName || message.pushName || 'Sem nome'}`);
+        console.log(`💬 Conteúdo: ${message.body}`);
+        console.log(`🕐 Horário: ${new Date().toLocaleString('pt-BR')}`);
+        console.log(`📱 Tipo: ${message.type}`);
+
+        const payload = {
+          from: message.from,
+          body: message.body,
+          notifyName: message.notifyName || message.pushName || 'Lead',
+          timestamp: message.timestamp,
+          fromMe: message.fromMe,
+          type: message.type
+        };
+
+        console.log('\n📤 Enviando para o CRM...');
+        console.log('🔗 URL:', WEBHOOK_URL);
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+        // Enviar para o webhook do Flask
+        const response = await axios.post(WEBHOOK_URL, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000
+        });
+
+        console.log('\n✅ SUCESSO! Resposta do CRM:');
+        console.log('   Status:', response.status);
+        console.log('   Data:', JSON.stringify(response.data, null, 2));
+        console.log('=====================================\n');
+
+      } catch (error) {
+        console.error('\n❌ ===== ERRO AO ENVIAR PARA CRM =====');
+        
+        if (error.code === 'ECONNREFUSED') {
+          console.error('🔴 CONEXÃO RECUSADA!');
+          console.error(`   O Flask está rodando em ${WEBHOOK_URL}?`);
+          console.error('   Verifique se o backend está online!');
+        } else if (error.code === 'ETIMEDOUT') {
+          console.error('⏱️  TIMEOUT! O Flask não respondeu em 10 segundos');
+        } else if (error.response) {
+          console.error('📛 Resposta de erro do Flask:');
+          console.error('   Status:', error.response.status);
+          console.error('   Data:', JSON.stringify(error.response.data, null, 2));
+        } else {
+          console.error('💥 Erro desconhecido:', error.message);
+          console.error('   Stack:', error.stack);
+        }
+        
+        console.error('=====================================\n');
+      }
+    });
+
+    // ============================
+    // API PARA ENVIAR MENSAGENS
+    // ============================
+    app.post('/send', async (req, res) => {
+      try {
+        const { phone, message } = req.body;
+
+        console.log(`\n📤 ===== ENVIANDO MENSAGEM =====`);
+        console.log(`📱 Para: ${phone}`);
+        console.log(`💬 Mensagem: ${message}`);
+
+        // Formatar número
+        const phoneFormatted = phone.includes('@c.us') ? phone : `${phone}@c.us`;
+
+        await client.sendText(phoneFormatted, message);
+
+        console.log(`✅ Mensagem enviada com sucesso!`);
+        console.log(`================================\n`);
+
+        res.json({ success: true });
+
+      } catch (error) {
+        console.error('\n❌ ===== ERRO AO ENVIAR MENSAGEM =====');
+        console.error('💥 Erro:', error.message);
+        console.error('======================================\n');
+
+        res.status(500).json({ 
+          success: false, 
+          error: error.message 
+        });
+      }
+    });
+
+    // ============================
+    // STATUS DA CONEXÃO
+    // ============================
+    app.get('/status', async (req, res) => {
+      try {
+        const hostDevice = await client.getHostDevice();
+        
+        res.json({
+          connected: true,
+          phone: hostDevice?.id?.user || 'Número não disponível',
+          session: 'veloce-crm',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.json({
+          connected: true,
+          phone: 'Não disponível',
+          session: 'veloce-crm',
+          timestamp: new Date().toISOString(),
+          warning: 'Não foi possível obter informações do dispositivo'
+        });
+      }
+    });
+
+    // ============================
+    // HEALTH CHECK
+    // ============================
+    app.get('/health', (req, res) => {
+      res.json({ 
+        status: 'ok',
+        service: 'venom-bot',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    // ============================
+    // INICIAR SERVIDOR
+    // ============================
+    app.listen(3001, () => {
+      console.log('\n🚀 Servidor Venom rodando em http://localhost:3001');
+      console.log('   POST /send - Enviar mensagem');
+      console.log('   GET /status - Status da conexão');
+      console.log('   GET /health - Health check');
+      console.log('   Webhook CRM: ' + WEBHOOK_URL);
+      console.log('');
+    });
+
+  })
+  .catch((error) => {
+    console.error('❌ Erro ao inicializar VenomBot:', error);
+    process.exit(1);
+  });

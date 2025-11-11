@@ -1,0 +1,25 @@
+{
+  "name": "crm-whatsapp-service",
+  "version": "2.0.0",
+  "description": "Serviço WhatsApp para CRM usando Baileys",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "clean": "node clean-session.js"
+  },
+  "keywords": ["whatsapp", "crm", "baileys"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.7",
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "pino": "^8.16.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

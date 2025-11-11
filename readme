@@ -1,0 +1,20 @@
+
+---
+
+## ⚙️ 1. Backend (Flask API)
+
+> Responsável pela API e banco de dados do CRM.
+
+### 🪄 Comandos para iniciar:
+
+```bash
+cd "C:\Users\SEU_USUARIO\OneDrive\Área de Trabalho\crm-whatsapp\backend"
+
+# Ativar ambiente virtual
+.\venv\Scripts\activate
+
+# Instalar dependências (somente no primeiro uso)
+pip install -r requirements.txt
+
+# Iniciar servidor Flask
+python app.py

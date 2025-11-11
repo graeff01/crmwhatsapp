@@ -1,135 +1,159 @@
-const venom = require('venom-bot');
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
+/**
+ * 🚀 Integração entre VenomBot e CRM Flask (localhost:5000)
+ * Atualizado para remover leads fakes e enviar mensagens reais do WhatsApp
+ */
+
+import venom from 'venom-bot';
+import express from 'express';
+import bodyParser from 'body-parser';
+import fetch from 'node-fetch';
 
 const app = express();
-app.use(express.json());
-app.use(cors());
+app.use(bodyParser.json());
 
-let venomClient = null;
+const FLASK_URL = 'http://localhost:5000/api/webhook/message'; // Endpoint do Flask
+const PORT = 3001;
 
-// Inicializar VenomBot
+// ============================
+// 1️⃣ INICIALIZAÇÃO DO VENOM
+// ============================
+console.log('⚙️ Iniciando VenomBot...');
+
 venom
   .create({
     session: 'veloce-crm',
     multidevice: true,
-    folderNameToken: 'tokens',
-    headless: false, // false = mostra o navegador para escanear QR Code
-    disableWelcome: true,
+    headless: false, // navegador visível para debug
     logQR: true,
   })
-  .then((client) => startVenom(client))
-  .catch((erro) => {
-    console.error('❌ Erro ao iniciar Venom:', erro);
+  .then((client) => start(client))
+  .catch((error) => {
+    console.error('❌ Erro ao iniciar Venom:', error);
   });
 
-async function startVenom(client) {
-  venomClient = client;
-  console.log('✅ WhatsApp conectado via VenomBot!');
-  console.log('📱 Número conectado:', await client.getHostDevice());
+// ============================
+// 2️⃣ FUNÇÃO PRINCIPAL
+// ============================
+function start(client) {
+  console.log(`✅ VenomBot inicializado com sucesso!`);
+  console.log(`🎯 Aguardando mensagens do WhatsApp...`);
 
-  // ===== RECEBER MENSAGENS =====
-  client.onMessage(async (message) => {
-    // Ignorar mensagens de grupo e mensagens enviadas por nós
-    if (message.isGroupMsg === false && !message.fromMe) {
-      
-      const phone = message.from.replace('@c.us', '');
-      const content = message.body || message.caption || '';
-      const name = message.sender.pushname || message.sender.name || 'Lead';
-
-      console.log(`📨 Nova mensagem de ${name} (${phone}): ${content}`);
-
-      // Enviar mensagem para o backend Python processar
-      try {
-        await axios.post('http://localhost:5000/api/webhook/message', {
-          phone: phone,
-          content: content,
-          name: name,
-          messageId: message.id,
-          timestamp: message.timestamp
-        });
-        console.log(`✅ Mensagem enviada para o CRM`);
-      } catch (error) {
-        console.error('❌ Erro ao enviar mensagem para o backend:', error.message);
-      }
+  // ============================
+  // 🔁 HEALTH CHECK
+  // ============================
+  app.get('/status', async (req, res) => {
+    try {
+      const state = await client.getConnectionState();
+      res.json({
+        connected: state === 'CONNECTED',
+        phone: client.session,
+        state,
+      });
+    } catch (error) {
+      res.status(500).json({ connected: false, error: error.message });
     }
   });
 
-  // Status de conexão
-  client.onStateChange((state) => {
-    console.log('📡 Estado da conexão:', state);
+  // ============================
+  // ✉️ RECEBER MENSAGEM DO WHATSAPP
+  // ============================
+  client.onMessage(async (message) => {
+    try {
+      // Ignora mensagens enviadas pelo próprio número
+      if (message.fromMe) return;
+
+      // Limpar número do WhatsApp
+      const rawPhone = message.from || '';
+      const phone = rawPhone.replace('@c.us', '').replace('+', '').trim();
+      const content = (message.body || '').trim();
+      const name = message.notifyName || message.sender?.pushname || 'Lead';
+
+      if (!phone || !content) return;
+
+      console.log('======================================================================');
+      console.log('💬 MENSAGEM RECEBIDA');
+      console.log('======================================================================');
+      console.log(`📱 De: ${name} (${phone})`);
+      console.log(`💬 Conteúdo: ${content}`);
+      console.log('======================================================================');
+
+      // Envia pro Flask
+      const payload = { phone, content, name };
+
+      const response = await fetch(FLASK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        console.log(`✅ Mensagem enviada ao Flask (${FLASK_URL}) com sucesso`);
+      } else {
+        const errorText = await response.text();
+        console.error(`❌ Erro ao enviar pro Flask: ${response.status} - ${errorText}`);
+      }
+    } catch (error) {
+      console.error('❌ Erro no processamento da mensagem:', error);
+    }
   });
 
-  console.log('🎯 VenomBot aguardando mensagens...');
+  // ============================
+  // 🚀 TESTE DE ENVIO MANUAL
+  // ============================
+  app.post('/send', async (req, res) => {
+    const { phone, message } = req.body;
+    if (!phone || !message) {
+      return res.status(400).json({ error: 'Faltam parâmetros (phone, message)' });
+    }
+
+    try {
+      const to = `${phone}@c.us`;
+      await client.sendText(to, message);
+      console.log(`📤 Mensagem enviada para ${phone}: ${message}`);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Erro ao enviar mensagem:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============================
+  // 🔌 DESCONECTAR MANUALMENTE
+  // ============================
+  app.post('/disconnect', async (req, res) => {
+    try {
+      await client.logout();
+      console.log('🔌 VenomBot desconectado manualmente.');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('❌ Erro ao desconectar:', error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // ============================
+  // 🧠 TESTE DE COMUNICAÇÃO COM FLASK
+  // ============================
+  app.get('/test-flask', async (req, res) => {
+    try {
+      const response = await fetch('http://localhost:5000/health');
+      const data = await response.json();
+      res.json({
+        flask_online: true,
+        flask_response: data,
+      });
+    } catch (error) {
+      res.json({
+        flask_online: false,
+        error: error.message,
+      });
+    }
+  });
+
+  // ============================
+  // 🌐 INICIALIZAR SERVIDOR EXPRESS
+  // ============================
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor Venom rodando em http://localhost:${PORT}`);
+  });
 }
-
-// ===== API PARA ENVIAR MENSAGENS =====
-
-// Endpoint para enviar mensagem de texto
-app.post('/send', async (req, res) => {
-  const { phone, message } = req.body;
-
-  if (!venomClient) {
-    return res.status(503).json({ error: 'WhatsApp não conectado' });
-  }
-
-  try {
-    const phoneFormatted = phone.includes('@c.us') ? phone : `${phone}@c.us`;
-    await venomClient.sendText(phoneFormatted, message);
-    console.log(`✅ Mensagem enviada para ${phone}: ${message}`);
-    res.json({ success: true });
-  } catch (error) {
-    console.error('❌ Erro ao enviar mensagem:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Endpoint para verificar status da conexão
-app.get('/status', async (req, res) => {
-  if (!venomClient) {
-    return res.json({ connected: false });
-  }
-
-  try {
-    const isConnected = await venomClient.isConnected();
-    const hostDevice = await venomClient.getHostDevice();
-    res.json({ 
-      connected: isConnected,
-      phone: hostDevice?.id?.user || 'Desconhecido'
-    });
-  } catch (error) {
-    res.json({ connected: false, error: error.message });
-  }
-});
-
-// Endpoint para desconectar
-app.post('/disconnect', async (req, res) => {
-  if (venomClient) {
-    await venomClient.close();
-    venomClient = null;
-    res.json({ success: true });
-  } else {
-    res.json({ success: false, message: 'Já desconectado' });
-  }
-});
-
-// Iniciar servidor
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor Venom rodando em http://localhost:${PORT}`);
-  console.log(`📡 Aguardando conexão do WhatsApp...`);
-});
-
-// Tratamento de erros
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('❌ Unhandled Rejection:', reason);
-});
-
-process.on('SIGINT', async () => {
-  console.log('\n⏹️  Encerrando VenomBot...');
-  if (venomClient) {
-    await venomClient.close();
-  }
-  process.exit(0);
-});

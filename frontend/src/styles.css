@@ -8,12 +8,16 @@
   padding: 0;
   box-sizing: border-box;
 }
+
 body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   background: #0b141a;
   color: #e9edef;
-  overflow: hidden;
+  overflow-x: hidden;  /* ← impede rolagem lateral */
+  overflow-y: auto;    /* ← permite rolagem vertical */
 }
+
+
 #root {
   height: 100vh;
   display: flex;
@@ -37,61 +41,53 @@ body {
   display: flex;
   width: 100%;
   height: 100vh;
-  background: #0b141a;
+  overflow: hidden;
 }
 
-.sidebar {
-  width: 340px;
-  background: linear-gradient(180deg, #1a232a 0%, #111b21 100%);
-  border-right: 1px solid #2a3942;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 2px 0 15px rgba(0, 0, 0, 0.4);
-}
-
-.sidebar-header {
-  padding: 24px 20px;
-  background: linear-gradient(180deg, #202c33, #1a232a);
-  border-bottom: 1px solid #2a3942;
-}
-
-.sidebar-header h2 {
-  font-size: 20px;
-  font-weight: 700;
-  color: #e9edef;
-  margin-bottom: 12px;
-}
-
-.sidebar-nav-button {
-  width: 100%;
-  margin: 0 0 10px 0;
-  padding: 12px 16px;
-  text-align: center;
-  background: #202c33;
-  border: 1px solid #2a3942;
+/* ===== BOTÃO DE SAIR ===== */
+.logout-button {
+  width: calc(100% - 40px);
+  margin: 18px auto 28px;
+  padding: 12px 14px;
   border-radius: 10px;
-  color: #aebac1;
+  border: 1px solid #2a3942;
+  color: #ff6b6b;
+  background: transparent;
   font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s ease;
 }
 
-.sidebar-nav-button:hover {
-  background: #2a3942;
+.logout-button:hover {
+  background: rgba(255, 77, 77, 0.08);
   color: #fff;
-  border-color: #00a884;
+  border-color: #d9534f;
+  transform: translateY(-1px);
 }
 
-.sidebar-nav-button.active {
-  background: linear-gradient(135deg, #00a884, #005c4b);
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #aebac1;
+}
+
+.role-badge {
+  background: linear-gradient(135deg, #00a884, #007c63);
   color: #fff;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
   font-weight: 600;
-  border-color: #00a884;
-  box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);
+  letter-spacing: 0.4px;
+  box-shadow: 0 4px 10px rgba(0, 168, 132, 0.35);
 }
 
 .logout-button {
@@ -138,42 +134,6 @@ body {
   align-self: flex-start;
   box-shadow: 0 4px 12px rgba(0, 168, 132, 0.3);
 }
-
-.sidebar-tabs {
-  display: flex;
-  background: #182229;
-  border-bottom: 1px solid #2a3942;
-}
-
-.sidebar-tabs .tab {
-  flex: 1;
-  padding: 16px;
-  text-align: center;
-  cursor: pointer;
-  border: none;
-  background: transparent;
-  color: #8696a0;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.sidebar-tabs .tab:hover {
-  background: #1e2a32;
-  color: #fff;
-}
-
-.sidebar-tabs .tab.active {
-  color: #00a884;
-  font-weight: 600;
-  background: #1f2c33;
-  border-bottom: 3px solid #00a884;
-}
-
 .leads-list {
   flex: 1;
   overflow-y: auto;
@@ -318,25 +278,192 @@ body {
   transform: translateY(-1px);
 }
 
+
+/* ===== SIDEBAR PREMIUM (CORRIGIDA PARA DASHBOARD) ===== */
+.sidebar {
+  display: flex;
+  height: 100vh;
+  flex-shrink: 0;
+  width: 340px;
+  background: linear-gradient(180deg, #1a232a 0%, #111b21 100%);
+  border-right: 1px solid #2a3942;
+  box-shadow: 2px 0 15px rgba(0, 0, 0, 0.4);
+  flex-direction: column;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+/* Cabeçalho fixo dentro da sidebar */
+.sidebar-header {
+  gap: 30px; /* <-- adiciona espaçamento entre o topo e os botões */
+  padding: 28px 24px;
+  background: linear-gradient(180deg, #1c262c, #141d22);
+  border-bottom: 1px solid #2a3942;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.sidebar-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #00a884;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+/* Botões */
+.sidebar-nav-button {
+  width: calc(100% - 40px);
+  margin: 10px auto;
+  padding: 12px 14px;
+  text-align: left;
+  background: #182229;
+  border: 1px solid #2a3942;
+  border-radius: 10px;
+  color: #aebac1;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.sidebar-nav-button:hover {
+  background: #1e2b32;
+  color: #fff;
+  border-color: #00a884;
+  transform: translateX(3px);
+}
+
+.sidebar-nav-button.active {
+  background: linear-gradient(135deg, #00a884, #005c4b);
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0, 168, 132, 0.35);
+}
+
+
+.sidebar-nav-button.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 4px;
+  height: 100%;
+  background: #00a884;
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+/* ===== TABS ===== */
+.sidebar-tabs {
+  display: flex;
+  background: #182229;
+  border-bottom: 1px solid #2a3942;
+}
+
+.sidebar-tabs .tab {
+  flex: 1;
+  padding: 16px;
+  text-align: center;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: #8696a0;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.sidebar-tabs .tab:hover {
+  background: #1e2a32;
+  color: #fff;
+}
+
+.sidebar-tabs .tab.active {
+  color: #00a884;
+  font-weight: 600;
+  background: #1f2c33;
+  border-bottom: 3px solid #00a884;
+}
+
 /* ===== RESPONSIVIDADE ===== */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: 300px;
+  }
+}
+
+/* ===== RESPONSIVO ===== */
 @media (max-width: 1024px) {
   .sidebar { width: 300px; }
 }
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
-    position: fixed;
     height: auto;
-    top: 0;
-    left: 0;
     flex-direction: row;
     overflow-x: auto;
     box-shadow: none;
-    z-index: 10;
   }
-  .sidebar-tabs { flex: 1; }
-  .leads-list { margin-top: 60px; }
 }
+
+/* ===== CONTEÚDO PRINCIPAL DO DASHBOARD ===== */
+.main-content {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto; /* ✅ apenas ela rola */
+  overflow-x: hidden;
+  background: #0b141a;
+  display: flex;
+  flex-direction: column;
+}
+
+
+@media (max-width: 1024px) {
+  .main-content {
+    width: calc(100% - 300px);
+    margin-left: 300px;
+  }
+}
+@media (max-width: 768px) {
+  .main-content {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+
+/* ===== LAYOUT ===== */
+.dashboard-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background: #0d1418;
+  overflow: hidden;
+}
+
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #0d1418;
+  color: #fff;
+  padding: 30px;
+  height: 100vh;
+}
+
+
+
 
 /* =========================================
    PARTE 2 – CHAT / TIMELINE / EMPTY STATE
@@ -854,18 +981,23 @@ body {
   padding: 2px 6px;
 }
 
+
+
 .main-content {
   flex: 1;
+  width: calc(100% - 340px);
+  margin-left: 0; /* já não precisamos do margin-left agora */
+  height: 100vh;
   overflow-y: auto;
   background: #0b141a;
 }
+
 
 /* ===== MÉTRICAS ===== */
 .metrics-container {
   padding: 24px;
   background: #0b141a;
   height: calc(100vh - 60px);
-  overflow-y: auto;
 }
 .metrics-header {
   margin-bottom: 20px;
@@ -896,6 +1028,15 @@ body {
   outline: 2px solid #00a884;
   border-color: #00a884;
 }
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden; /* bloqueia rolagem no body */
+  margin: 0;
+  padding: 0;
+  background: #0b141a;
+}
+
 
 /* KPIs */
 .metrics-grid {

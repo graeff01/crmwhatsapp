@@ -1,0 +1,89 @@
+.tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  border: 1px solid;
+  margin: 2px;
+  transition: all 0.2s;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.tag-badge-small {
+  padding: 2px 6px;
+  font-size: 10px;
+  border-radius: 8px;
+}
+
+.tag-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tag-badge-small .tag-icon {
+  font-size: 12px;
+}
+
+.tag-name {
+  line-height: 1;
+}
+
+.tag-remove {
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+  margin-left: 2px;
+  transition: background 0.2s;
+}
+
+.tag-remove:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.tag-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.add-tag-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  background: #f0f0f0;
+  border: 1px dashed #ccc;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.add-tag-button:hover {
+  background: #e0e0e0;
+  border-color: #999;
+  color: #333;
+}

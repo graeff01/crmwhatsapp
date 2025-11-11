@@ -30,3 +30,11 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #999;
 }
+
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden; /* trava o scroll do body */
+  margin: 0;
+  background: #0d1418;
+}

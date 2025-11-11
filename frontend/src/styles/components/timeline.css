@@ -1,0 +1,108 @@
+.lead-notes-wrapper {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Formulário */
+.add-note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.note-input {
+  background: #10181f;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  resize: none;
+  min-height: 70px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.note-input:focus {
+  border-color: #00a884;
+  box-shadow: 0 0 0 2px #00a88433;
+}
+
+.add-note-btn {
+  background: linear-gradient(90deg, #00a884, #00c394);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+.add-note-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(90deg, #00c394, #00e3a8);
+}
+.add-note-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Lista de notas */
+.notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.note-card {
+  display: flex;
+  align-items: flex-start;
+  background: #0d141a;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 12px 14px;
+  gap: 10px;
+  animation: fadeIn 0.3s ease;
+}
+.note-icon {
+  background: #1a232b;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.note-content {
+  flex: 1;
+}
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin-bottom: 4px;
+}
+.note-content p {
+  color: #fff;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Estados */
+.note-loading,
+.note-empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
