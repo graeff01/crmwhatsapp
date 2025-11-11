@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🚀 CRM WhatsApp Multi-Atendente - MVP
 
 Sistema de CRM com interface compartilhada de WhatsApp onde múltiplos vendedores podem atender leads através de um único número.
@@ -229,3 +230,6 @@ Dúvidas ou problemas? Me chama que eu te ajudo a configurar!
 
 **Desenvolvido para**: Veloce - Agência Digital  
 **Objetivo**: MVP funcional para testar fluxo multi-atendente antes de integrar WhatsApp Business API oficial
+=======
+# crmwhatsapp
+>>>>>>> 5b044837e24ce04c320a3d1530e5f6168594321c
