@@ -7,12 +7,9 @@ import Metrics from './Metrics';
 import Kanban from './Kanban';
 import { ToastManager, toast } from './Toast';
 import LeadTimeline from "./LeadTimeline";
+import NotificationsContainer from './NotificationsContainer';
 import '../styles/components/Kanban.css';
 import '../styles/components/chat.css';
-
-
-
-
 
 export default function Dashboard({ user, onLogout }) {
   const [activeTab, setActiveTab] = useState('meus-leads');
@@ -25,9 +22,6 @@ export default function Dashboard({ user, onLogout }) {
   const [fromKanbanLead, setFromKanbanLead] = useState(null);
   const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [newMessagesCount, setNewMessagesCount] = useState(0);
-  const [activeLead, setActiveLead] = useState(null);
-  const [currentView, setCurrentView] = useState("kanban"); // "kanban" | "chat" | "metrics"
-
 
   const newLeadSound = useRef(null);
   const newMessageSound = useRef(null);
@@ -114,7 +108,7 @@ export default function Dashboard({ user, onLogout }) {
   // ================= AÇÕES =================
   const handleSelectLead = (lead) => {
     setSelectedLead(lead);
-    setNewMessagesCount(0); // zera badge
+    setNewMessagesCount(0);
     loadMessages(lead.id);
   };
 
@@ -151,6 +145,8 @@ export default function Dashboard({ user, onLogout }) {
       toast.error('❌ Falha ao enviar mensagem');
     }
   };
+
+  
 
   // ================= KANBAN → CHAT =================
   useEffect(() => {
@@ -214,117 +210,124 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* ==== MODO GERENCIAL ==== */}
       {['kanban', 'metricas', 'config'].includes(activeTab) ? (
-  <div className="dashboard-layout">
-    
-    {/* ==== SIDEBAR FIXA ==== */}
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-brand">
-          <h2>💬 CRM <span>WhatsApp</span></h2>
-          <p className="sidebar-subtitle">
-            {user.role === 'admin' ? 'Administrador' : user.role === 'gestor' ? 'Gestor' : 'Vendedor'}
-          </p>
-          <span className="sidebar-badge">{user.role.toUpperCase()}</span>
+        <div className="dashboard-layout">
+          
+          {/* ==== SIDEBAR FIXA ==== */}
+          <aside className="sidebar">
+            <div className="sidebar-header">
+              <div className="sidebar-brand">
+                <h2>💬 CRM <span>WhatsApp</span></h2>
+                <p className="sidebar-subtitle">
+                  {user.role === 'admin' ? 'Administrador' : user.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                </p>
+                <span className="sidebar-badge">{user.role.toUpperCase()}</span>
+              </div>
+
+              {/* 🔔 COMPONENTE DE NOTIFICAÇÕES */}
+              <div style={{ padding: '10px 15px', borderBottom: '1px solid #e2e8f0' }}>
+                <NotificationsContainer />
+              </div>
+
+              <nav className="sidebar-menu">
+                <button
+                  className={`sidebar-item ${activeTab === 'meus-leads' ? 'active' : ''}`}
+                  onClick={() => setActiveTab('meus-leads')}
+                >
+                  🏠 Início
+                </button>
+
+                {(user.role === 'admin' || user.role === 'gestor') && (
+                  <>
+                    <button
+                      className={`sidebar-item ${activeTab === 'kanban' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('kanban')}
+                    >
+                      🗂 Kanban
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'metricas' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('metricas')}
+                    >
+                      📊 Métricas
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('config')}
+                    >
+                      ⚙️ Config
+                    </button>
+                  </>
+                )}
+
+                <div className="sidebar-divider"></div>
+
+                <button className="sidebar-item logout" onClick={onLogout}>
+                  <LogOut size={16} /> Sair
+                </button>
+              </nav>
+            </div>
+          </aside>
+
+          {/* ==== CONTEÚDO PRINCIPAL ==== */}
+          <main className="main-content">
+            {activeTab === 'kanban' && (
+              <Kanban user={user} onOpenLead={(lead) => setFromKanbanLead(lead)} />
+            )}
+            {activeTab === 'metricas' && <Metrics currentUser={user} />}
+            {activeTab === 'config' && <UserManagement currentUser={user} />}
+          </main>
+
         </div>
-
-        <nav className="sidebar-menu">
-  {/* 🔙 Botão Voltar para o Início */}
-  <button
-    className={`sidebar-item ${activeTab === 'meus-leads' ? 'active' : ''}`}
-    onClick={() => setActiveTab('meus-leads')}
-  >
-    🏠 Início
-  </button>
-
-  {(user.role === 'admin' || user.role === 'gestor') && (
-    <>
-      <button
-        className={`sidebar-item ${activeTab === 'kanban' ? 'active' : ''}`}
-        onClick={() => setActiveTab('kanban')}
-      >
-        🗂 Kanban
-      </button>
-      <button
-        className={`sidebar-item ${activeTab === 'metricas' ? 'active' : ''}`}
-        onClick={() => setActiveTab('metricas')}
-      >
-        📊 Métricas
-      </button>
-      <button
-        className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}
-        onClick={() => setActiveTab('config')}
-      >
-        ⚙️ Config
-      </button>
-    </>
-  )}
-
-  <div className="sidebar-divider"></div>
-
-  <button className="sidebar-item logout" onClick={onLogout}>
-    <LogOut size={16} /> Sair
-  </button>
-</nav>
-
-      </div>
-    </aside>
-
-    {/* ==== CONTEÚDO PRINCIPAL ==== */}
-    <main className="main-content">
-      {activeTab === 'kanban' && (
-        <Kanban user={user} onOpenLead={(lead) => setFromKanbanLead(lead)} />
-      )}
-      {activeTab === 'metricas' && <Metrics currentUser={user} />}
-      {activeTab === 'config' && <UserManagement currentUser={user} />}
-    </main>
-
-  </div>
-) : (
+      ) : (
 
         /* ==== MODO DE ATENDIMENTO ==== */
         <>
           <div className="sidebar">
             <div className="sidebar-header">
-  <div className="sidebar-brand">
-    <h2>💬 CRM <span>WhatsApp</span></h2>
-    <p className="sidebar-subtitle">
-      {user.role === 'admin' ? 'Administrador' : user.role === 'gestor' ? 'Gestor' : 'Vendedor'}
-    </p>
-    <span className="sidebar-badge">{user.role.toUpperCase()}</span>
-  </div>
+              <div className="sidebar-brand">
+                <h2>💬 CRM <span>WhatsApp</span></h2>
+                <p className="sidebar-subtitle">
+                  {user.role === 'admin' ? 'Administrador' : user.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                </p>
+                <span className="sidebar-badge">{user.role.toUpperCase()}</span>
+              </div>
 
-  <nav className="sidebar-menu">
-    {(user.role === 'admin' || user.role === 'gestor') && (
-      <>
-        <button
-          className={`sidebar-item ${activeTab === 'kanban' ? 'active' : ''}`}
-          onClick={() => setActiveTab('kanban')}
-        >
-          🗂 Kanban
-        </button>
-        <button
-          className={`sidebar-item ${activeTab === 'metricas' ? 'active' : ''}`}
-          onClick={() => setActiveTab('metricas')}
-        >
-          📊 Métricas
-        </button>
-        <button
-          className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}
-          onClick={() => setActiveTab('config')}
-        >
-          ⚙️ Configurações
-        </button>
-      </>
-    )}
+              {/* 🔔 COMPONENTE DE NOTIFICAÇÕES */}
+              <div style={{ padding: '10px 15px', borderBottom: '1px solid #e2e8f0' }}>
+                <NotificationsContainer />
+              </div>
 
-    <div className="sidebar-divider"></div>
+              <nav className="sidebar-menu">
+                {(user.role === 'admin' || user.role === 'gestor') && (
+                  <>
+                    <button
+                      className={`sidebar-item ${activeTab === 'kanban' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('kanban')}
+                    >
+                      🗂 Kanban
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'metricas' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('metricas')}
+                    >
+                      📊 Métricas
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('config')}
+                    >
+                      ⚙️ Configurações
+                    </button>
+                  </>
+                )}
 
-    <button className="sidebar-item logout" onClick={onLogout}>
-      <LogOut size={16} /> Sair
-    </button>
-  </nav>
-</div>
+                <div className="sidebar-divider"></div>
 
+                <button className="sidebar-item logout" onClick={onLogout}>
+                  <LogOut size={16} /> Sair
+                </button>
+              </nav>
+            </div>
 
             <div className="sidebar-tabs">
               <button
@@ -352,29 +355,28 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            {/* ===== LISTA DE LEADS (PREMIUM ORGANIZADO) ===== */}
-<div className="leads-list">
-  {activeTab === 'meus-leads' && (
-    <>
-      <div className="leads-header">
-        <h3>📞 Meus Leads</h3>
-        <span>{leads.length} ativos</span>
-      </div>
-      {renderLeadsList(leads)}
-    </>
-  )}
+            {/* ===== LISTA DE LEADS ===== */}
+            <div className="leads-list">
+              {activeTab === 'meus-leads' && (
+                <>
+                  <div className="leads-header">
+                    <h3>📞 Meus Leads</h3>
+                    <span>{leads.length} ativos</span>
+                  </div>
+                  {renderLeadsList(leads)}
+                </>
+              )}
 
-  {activeTab === 'fila' && (
-    <>
-      <div className="leads-header">
-        <h3>📥 Fila de Leads</h3>
-        <span>{queueLeads.length} disponíveis</span>
-      </div>
-      {renderLeadsList(queueLeads, true)}
-    </>
-  )}
-</div>
-
+              {activeTab === 'fila' && (
+                <>
+                  <div className="leads-header">
+                    <h3>📥 Fila de Leads</h3>
+                    <span>{queueLeads.length} disponíveis</span>
+                  </div>
+                  {renderLeadsList(queueLeads, true)}
+                </>
+              )}
+            </div>
           </div>
 
           <div className="chat-container">
@@ -386,42 +388,40 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
 
                 <div className="chat-messages">
-                  
-              {messages && Array.isArray(messages) ? (
-                messages.map((msg, i) => (
-                  <div key={i} className={`message from-${msg.sender_type}`}>
-                    <div className="message-bubble">
-                      {msg.sender_type === 'vendedor' && (
-                        <div className="message-sender">{msg.sender_name || 'Você'}</div>
-                      )}
-                      <div className="message-content">{msg.content}</div>
-                      <div className="message-time">{formatTime(msg.timestamp)}</div>
-                    </div>
-                  </div>
-                ))
-              ) : messages?.items ? (
-                messages.items.map((msg, i) => (
-                  <div key={i} className={`message from-${msg.sender_type}`}>
-                    <div className="message-bubble">
-                      {msg.sender_type === 'vendedor' && (
-                        <div className="message-sender">{msg.sender_name || 'Você'}</div>
-                      )}
-                      <div className="message-content">{msg.content}</div>
-                      <div className="message-time">{formatTime(msg.timestamp)}</div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="no-messages">Nenhuma mensagem ainda</div>
-              )}
-            </div>
+                  {messages && Array.isArray(messages) ? (
+                    messages.map((msg, i) => (
+                      <div key={i} className={`message from-${msg.sender_type}`}>
+                        <div className="message-bubble">
+                          {msg.sender_type === 'vendedor' && (
+                            <div className="message-sender">{msg.sender_name || 'Você'}</div>
+                          )}
+                          <div className="message-content">{msg.content}</div>
+                          <div className="message-time">{formatTime(msg.timestamp)}</div>
+                        </div>
+                      </div>
+                    ))
+                  ) : messages?.items ? (
+                    messages.items.map((msg, i) => (
+                      <div key={i} className={`message from-${msg.sender_type}`}>
+                        <div className="message-bubble">
+                          {msg.sender_type === 'vendedor' && (
+                            <div className="message-sender">{msg.sender_name || 'Você'}</div>
+                          )}
+                          <div className="message-content">{msg.content}</div>
+                          <div className="message-time">{formatTime(msg.timestamp)}</div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="no-messages">Nenhuma mensagem ainda</div>
+                  )}
+                </div>
 
                 {/* ===== TIMELINE DO LEAD ===== */}
                 <div className="lead-timeline-wrapper">
                   <h4 style={{ margin: "15px 0 5px 10px", color: "#555" }}>Histórico do Lead</h4>
                   <LeadTimeline leadId={selectedLead?.id} />
                 </div>
-
 
                 <form onSubmit={handleSendMessage} className="chat-input-wrapper">
                   <input
@@ -444,8 +444,8 @@ export default function Dashboard({ user, onLogout }) {
         </>
       )}
       
-
       <ToastManager />
     </div>
   );
 }
+

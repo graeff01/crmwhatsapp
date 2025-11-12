@@ -1,0 +1,232 @@
+/* ========================================
+   CSS ORIGINAL + FIX DE SCROLL
+   ======================================== */
+
+.alerts-panel {
+  background: #1e293b;
+  border-radius: 12px;
+  padding: 24px;
+  margin-top: 24px;
+}
+
+.alerts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #334155;
+}
+
+.alerts-header h2 {
+  margin: 0;
+  color: #f1f5f9;
+  font-size: 24px;
+}
+
+.alerts-stats {
+  display: flex;
+  gap: 12px;
+}
+
+.stat {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.stat.critical {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.stat.danger {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.stat.warning {
+  background: rgba(234, 179, 8, 0.2);
+  color: #eab308;
+}
+
+/* ========================================
+   🔧 NOVO: CONTAINER COM SCROLL
+   ======================================== */
+
+.alerts-list {
+  max-height: 500px; /* Altura máxima antes do scroll */
+  overflow-y: auto;
+  padding-right: 8px; /* Espaço para a scrollbar */
+}
+
+/* Estilizar scrollbar */
+.alerts-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.alerts-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.alerts-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.alerts-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox */
+.alerts-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(255, 255, 255, 0.05);
+}
+
+/* ========================================
+   RESTO DO CSS ORIGINAL
+   ======================================== */
+
+.no-alerts {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.no-alerts .emoji {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.no-alerts h3 {
+  margin: 0 0 8px 0;
+  color: #e2e8f0;
+}
+
+.alert-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #0f172a;
+  border-radius: 8px;
+  border-left: 4px solid;
+  margin-bottom: 12px;
+  transition: all 0.2s;
+}
+
+.alert-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.alert-item.critical {
+  border-left-color: #ef4444;
+}
+
+.alert-item.danger {
+  border-left-color: #f59e0b;
+}
+
+.alert-item.warning {
+  border-left-color: #eab308;
+}
+
+.alert-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.alert-content {
+  flex: 1;
+}
+
+.alert-content h4 {
+  margin: 0 0 8px 0;
+  color: #f1f5f9;
+  font-size: 16px;
+}
+
+.alert-content p {
+  margin: 0 0 8px 0;
+  color: #cbd5e1;
+  font-size: 14px;
+}
+
+.alert-details {
+  margin-top: 8px;
+}
+
+.suggestion {
+  display: inline-block;
+  padding: 4px 8px;
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.alert-time {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 8px;
+}
+
+.alert-actions {
+  display: flex;
+  align-items: center;
+}
+
+.btn-resolve {
+  padding: 8px 16px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.btn-resolve:hover {
+  background: #059669;
+  transform: scale(1.05);
+}
+
+/* ========================================
+   RESPONSIVO
+   ======================================== */
+
+@media (max-width: 768px) {
+  .alerts-list {
+    max-height: 400px;
+  }
+  
+  .alerts-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .alert-item {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  .alerts-list {
+    max-height: 300px;
+  }
+  
+  .alert-item {
+    padding: 12px;
+  }
+  
+  .btn-resolve {
+    width: 100%;
+  }
+}

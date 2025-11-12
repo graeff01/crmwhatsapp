@@ -1,1 +1,92 @@
 node_modules
+# ========================================
+# SECRETS E CREDENCIAIS
+# ========================================
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+token.json
+config.json
+
+# ========================================
+# DATABASE
+# ========================================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ========================================
+# WHATSAPP SESSION (CRÍTICO!)
+# ========================================
+auth_info_baileys/
+tokens/
+sessions/
+.wwebjs_auth/
+.wwebjs_cache/
+whatsapp-service/auth_info_baileys/
+sender-key-*
+session-*
+pre-key-*
+app-state-sync-*
+creds.json
+
+# ========================================
+# PYTHON
+# ========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# ========================================
+# NODE
+# ========================================
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# ========================================
+# IDEs
+# ========================================
+.vscode/
+.idea/
+*.swp
+
+# ========================================
+# OS
+# ========================================
+.DS_Store
+Thumbs.db
+
+# ========================================
+# LOGS
+# ========================================
+*.log
+logs/
+
+# ========================================
+# BACKUPS
+# ========================================
+*.backup
+*.bak
+
+# ========================================
+# GOOGLE CREDENTIALS (CRÍTICO!)
+# ========================================
+*credentials*.json
+*-sheets-*.json
+google_sheets_config.env
+backend/banco/*.json
+backend/banco/*.env

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, session
 from flask_socketio import SocketIO, join_room, leave_room
 from flask_cors import CORS
+from notification_service import NotificationService
 from database import Database
 from whatsapp_service import WhatsAppService
 from middlewares import (
@@ -12,6 +13,11 @@ import asyncio
 from functools import wraps
 from database_tags_sla import extend_database_with_tags_sla
 from datetime import datetime
+from advanced_cache import cached, invalidate_cache, get_cache_stats
+from alert_system import AlertSystem
+from alert_monitoring_service import AlertMonitoringService, check_alerts_once
+from gestor_whatsapp_notifier import GestorWhatsAppNotifier
+
 
 # =======================
 # CONFIGURAÇÃO PRINCIPAL
@@ -23,6 +29,9 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 CORS(app, supports_credentials=True, origins=["http://localhost:3000"])
 
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+
+# Inicializar serviço de notificações
+notification_service = NotificationService(socketio)
 
 # Inicialização dos serviços
 db = Database()
@@ -37,6 +46,18 @@ lead_searcher = LeadSearcher(db)
 cache = PerformanceCache(ttl_seconds=300)
 
 print("🚀 CRM WhatsApp iniciado com todas as melhorias!")
+
+# 🚨 Inicializar sistema de alertas
+alert_monitoring = AlertMonitoringService(
+    db=db,
+    socketio=socketio,
+    notification_service=notification_service,
+    whatsapp_service=whatsapp,
+    check_interval=300  # Verifica a cada 5 minutos
+)
+
+# Iniciar monitoramento em background
+alert_monitoring.start()
 
 # =======================
 # MIDDLEWARE GLOBAL
@@ -68,6 +89,83 @@ def role_required(*roles):
             return f(*args, **kwargs)
         return decorated
     return decorator
+
+
+# ========================================
+# GOOGLE SHEETS INTEGRATION
+# ========================================
+
+from banco.google_sheets_service import GoogleSheetsService
+import os
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente
+load_dotenv()
+
+# Inicializar Google Sheets
+sheets_service = None
+if os.getenv('GOOGLE_SHEETS_ENABLED') == 'True':
+    try:
+        sheets_service = GoogleSheetsService(
+            credentials_path=os.getenv('GOOGLE_SHEETS_CREDENTIALS'),
+            spreadsheet_id=os.getenv('GOOGLE_SHEETS_SPREADSHEET_ID')
+        )
+        
+        # ⚠️ EXECUTAR APENAS UMA VEZ (primeira configuração)
+        # sheets_service.setup_spreadsheet()
+        
+        # Testar conexão
+        if sheets_service.test_connection():
+            print("✅ Google Sheets integrado com sucesso!")
+            print(f"📊 Planilha: {sheets_service.get_spreadsheet_url()}")
+        
+    except Exception as e:
+        print(f"⚠️ Google Sheets desabilitado: {e}")
+        sheets_service = None
+
+
+# =======================
+# HELPER: SINCRONIZAR COM SHEETS
+# =======================
+def sync_lead_to_sheets(lead_id):
+    """Sincroniza um lead com o Google Sheets"""
+    if not sheets_service:
+        return
+    
+    try:
+        lead = db.get_lead(lead_id)
+        if lead:
+            lead['tags'] = db.get_lead_tags(lead_id)
+            sheets_service.sync_lead(lead)
+            print(f"📊 Lead {lead_id} sincronizado com Sheets")
+    except Exception as e:
+        print(f"⚠️ Erro ao sincronizar lead {lead_id}: {e}")
+
+
+def sync_message_to_sheets(message_data):
+    """Sincroniza uma mensagem com o Google Sheets"""
+    if not sheets_service:
+        return
+    
+    try:
+        sheets_service.add_message(message_data)
+        print(f"📊 Mensagem sincronizada com Sheets")
+    except Exception as e:
+        print(f"⚠️ Erro ao sincronizar mensagem: {e}")
+
+
+def update_sheets_metrics():
+    """Atualiza métricas no Google Sheets"""
+    if not sheets_service:
+        return
+    
+    try:
+        metrics = db.get_metrics_summary()
+        sheets_service.update_metrics(metrics)
+        print(f"📊 Métricas atualizadas no Sheets")
+    except Exception as e:
+        print(f"⚠️ Erro ao atualizar métricas: {e}")
+
 
 # =======================
 # LOGIN / LOGOUT
@@ -125,6 +223,7 @@ def get_current_user():
 @app.route("/api/users", methods=["GET"])
 @rate_limit('per_minute')
 @role_required("admin", "gestor")
+@cached(ttl=60, key_prefix="users")  # ← ADICIONE ESTA LINHA
 def get_users():
     return jsonify(db.get_all_users())
 
@@ -181,6 +280,7 @@ def change_password(user_id):
 @app.route("/api/leads", methods=["GET"])
 @rate_limit('per_minute')
 @login_required
+@cached(ttl=30, key_prefix="leads")  # ← ADICIONE ESTA LINHA
 def get_leads():
     role = session["role"]
     uid = session["user_id"]
@@ -225,6 +325,17 @@ def assign_lead(lead_id):
     db.assign_lead(lead_id, uid)
     db.add_lead_log(lead_id, "lead_atribuido", uname, f"Lead atribuído para {uname}")
     audit_logger.log_action(uid, "lead_assigned", "lead", lead_id, f"Lead atribuído")
+
+     # 🔔 Notificar atribuição
+    lead = db.get_lead(lead_id)
+    notification_service.notify_lead_assigned(lead, uname, uid, room='gestores')
+    
+    
+    # 📊 Sincronizar com Google Sheets
+    sync_lead_to_sheets(lead_id)
+
+    # 🗑️ Invalida cache (ADICIONE ESTA LINHA)
+    invalidate_cache("leads")
     
     socketio.emit("lead_assigned", {"lead_id": lead_id, "vendedor_id": uid}, room="gestores")
     return jsonify({"success": True})
@@ -240,10 +351,29 @@ def update_lead_status(lead_id):
     status = data["status"]
     uname = session["name"]
     
+    # 🔹 Pegar status antigo ANTES de atualizar
+    lead_atual = db.get_lead(lead_id)
+    old_status = lead_atual.get('status', 'novo') if lead_atual else 'novo'
+    
+    # Atualizar status
     db.update_lead_status(lead_id, status)
     db.add_lead_log(lead_id, "status_alterado", uname, f"Status alterado para {status}")
     audit_logger.log_action(session["user_id"], "status_changed", "lead", lead_id, f"Status: {status}")
     
+    # 🔔 Notificar mudança de status
+    lead_atualizado = db.get_lead(lead_id)
+    if lead_atualizado:
+        notification_service.notify_status_changed(lead_atualizado, old_status, status, room='gestores')
+    
+    # 📊 Sincronizar com Google Sheets
+    sync_lead_to_sheets(lead_id)
+    
+    # 📊 Atualizar métricas
+    update_sheets_metrics()
+
+    invalidate_cache("leads")
+    invalidate_cache("metrics")
+   
     socketio.emit("lead_status_changed", {"lead_id": lead_id, "status": status}, room="gestores")
     return jsonify({"success": True})
 
@@ -261,6 +391,9 @@ def transfer_lead(lead_id):
     db.transfer_lead(lead_id, vendedor_id)
     db.add_lead_log(lead_id, "lead_transferido", uname, f"Lead transferido")
     audit_logger.log_action(session["user_id"], "lead_transferred", "lead", lead_id, f"Para vendedor {vendedor_id}")
+    
+    # 📊 Sincronizar com Google Sheets
+    sync_lead_to_sheets(lead_id)
     
     socketio.emit("lead_transferred", {"lead_id": lead_id, "vendedor_id": vendedor_id}, room="gestores")
     return jsonify({"success": True})
@@ -304,6 +437,20 @@ def send_message(lead_id):
     if success:
         db.add_lead_log(lead_id, "mensagem_enviada", uname, content[:80])
         audit_logger.log_action(uid, "message_sent", "message", lead_id, f"Mensagem enviada para lead {lead_id}")
+        
+        # 📊 Sincronizar mensagem com Google Sheets
+        sync_message_to_sheets({
+            'id': db.get_connection().cursor().lastrowid,
+            'lead_id': lead_id,
+            'lead_nome': lead['name'],
+            'is_from_me': True,
+            'mensagem': content,
+            'timestamp': datetime.now().isoformat(),
+            'status': 'enviada'
+        })
+        
+        # 📊 Atualizar lead no Sheets (última mensagem)
+        sync_lead_to_sheets(lead_id)
     
     return jsonify({"success": success})
 
@@ -355,17 +502,178 @@ def get_lead_logs(lead_id):
     logs = db.get_lead_logs(lead_id)
     return jsonify(logs)
 
-# =======================
-# MÉTRICAS
-# =======================
-@app.route("/api/metrics", methods=["GET"])
-@rate_limit('per_minute')
+# ========================================
+# 📊 ENDPOINT DE MÉTRICAS AVANÇADAS (CORRIGIDO)
+# ========================================
+
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+@app.route('/api/metrics', methods=['GET'])
 @login_required
-@handle_errors
 def get_metrics():
-    """Retorna métricas gerais do CRM"""
-    metrics = db.get_metrics_summary()
+    """Retorna métricas avançadas do CRM"""
+    period = request.args.get('period', 'month')
+    vendedor_id = request.args.get('vendedor_id', None)
+
+    now = datetime.now()
+    if period == 'day':
+        start_date = now - timedelta(days=1)
+    elif period == 'week':
+        start_date = now - timedelta(days=7)
+    else:
+        start_date = now - timedelta(days=30)
+
+    conn = db.get_connection()
+    c = conn.cursor()
+
+    # ========= 1. BASE =========
+    where_base = "WHERE l.created_at >= ?"
+    params = [start_date.strftime('%Y-%m-%d %H:%M:%S')]
+    if vendedor_id:
+        where_base += " AND l.assigned_to = ?"
+        params.append(vendedor_id)
+
+    # ========= 2. MÉTRICAS GERAIS =========
+    c.execute(f'''
+        SELECT 
+            COUNT(*) as total_leads,
+            SUM(CASE WHEN status = 'ganho' THEN 1 ELSE 0 END) as leads_ganhos,
+            SUM(CASE WHEN status = 'novo' THEN 1 ELSE 0 END) as leads_novo,
+            SUM(CASE WHEN status = 'em_atendimento' THEN 1 ELSE 0 END) as leads_atendimento,
+            SUM(CASE WHEN status = 'qualificado' THEN 1 ELSE 0 END) as leads_qualificado,
+            SUM(CASE WHEN status = 'perdido' THEN 1 ELSE 0 END) as leads_perdido
+        FROM leads l
+        {where_base}
+    ''', params)
+    metrics = dict(c.fetchone() or {})
+
+    metrics.setdefault('total_leads', 0)
+    metrics.setdefault('leads_ganhos', 0)
+
+    metrics['taxa_conversao'] = (
+        round((metrics['leads_ganhos'] / metrics['total_leads']) * 100, 1)
+        if metrics['total_leads'] > 0 else 0
+    )
+
+    # ========= 3. TEMPO MÉDIO DE RESPOSTA =========
+    query_tempo = f'''
+        SELECT AVG(
+            (julianday(m.timestamp) - julianday(l.created_at)) * 24 * 60
+        ) as tempo_medio
+        FROM messages m
+        INNER JOIN leads l ON m.lead_id = l.id
+        WHERE m.sender_type = 'vendedor'
+        AND m.id = (
+            SELECT MIN(id)
+            FROM messages
+            WHERE lead_id = l.id AND sender_type = 'vendedor'
+        )
+        AND l.created_at >= ?
+    '''
+    params_tempo = [start_date.strftime('%Y-%m-%d %H:%M:%S')]
+    if vendedor_id:
+        query_tempo += " AND l.assigned_to = ?"
+        params_tempo.append(vendedor_id)
+
+    c.execute(query_tempo, params_tempo)
+    tempo = c.fetchone()
+    metrics['tempo_resposta'] = round(tempo['tempo_medio'] or 0, 1)
+
+    # ========= 4. SLA =========
+    meta_sla = 15
+    query_sla = f'''
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE 
+                WHEN (julianday(m.timestamp) - julianday(l.created_at)) * 24 * 60 <= {meta_sla}
+                THEN 1 ELSE 0 
+            END) as dentro_sla
+        FROM messages m
+        INNER JOIN leads l ON m.lead_id = l.id
+        WHERE m.sender_type = 'vendedor'
+        AND m.id = (
+            SELECT MIN(id)
+            FROM messages
+            WHERE lead_id = l.id AND sender_type = 'vendedor'
+        )
+        AND l.created_at >= ?
+    '''
+    params_sla = [start_date.strftime('%Y-%m-%d %H:%M:%S')]
+    if vendedor_id:
+        query_sla += " AND l.assigned_to = ?"
+        params_sla.append(vendedor_id)
+
+    c.execute(query_sla, params_sla)
+    sla = dict(c.fetchone() or {'total': 0, 'dentro_sla': 0})
+    if sla['total'] > 0:
+        sla['dentro_sla'] = round((sla['dentro_sla'] / sla['total']) * 100, 1)
+        sla['fora_sla'] = round(100 - sla['dentro_sla'], 1)
+    else:
+        sla['dentro_sla'] = 0
+        sla['fora_sla'] = 0
+    sla['meta_minutos'] = meta_sla
+    metrics['sla_compliance'] = sla
+
+    # ========= 5. DISTRIBUIÇÃO DE CARGA =========
+    c.execute(f'''
+        SELECT 
+            COALESCE(u.name, 'Sem atribuir') as vendedor,
+            COUNT(*) as leads
+        FROM leads l
+        LEFT JOIN users u ON l.assigned_to = u.id
+        {where_base}
+        GROUP BY u.id, u.name
+        ORDER BY leads DESC
+    ''', params)
+    carga = []
+    for row in c.fetchall():
+        total_leads = metrics['total_leads'] or 1
+        carga.append({
+            'vendedor': row['vendedor'],
+            'leads': row['leads'],
+            'percent': round((row['leads'] / total_leads) * 100, 1)
+        })
+    metrics['distribuicao_carga'] = carga
+
+    # ========= 6. RANKING =========
+    c.execute(f'''
+        SELECT 
+            u.name,
+            COUNT(*) as total_leads,
+            SUM(CASE WHEN l.status = 'ganho' THEN 1 ELSE 0 END) as ganhos,
+            ROUND(
+                (SUM(CASE WHEN l.status = 'ganho' THEN 1.0 ELSE 0 END) / COUNT(*)) * 100, 
+                1
+            ) as taxa
+        FROM leads l
+        INNER JOIN users u ON l.assigned_to = u.id
+        {where_base}
+        GROUP BY u.id, u.name
+        ORDER BY ganhos DESC, taxa DESC
+        LIMIT 5
+    ''', params)
+    ranking = []
+    for row in c.fetchall():
+        ranking.append({
+            'name': row['name'],
+            'ganhos': row['ganhos'],
+            'taxa': row['taxa'] or 0
+        })
+    metrics['ranking'] = ranking
+
+    # ========= 7. FUNIL =========
+    metrics['funil'] = {
+        'novo': metrics.get('leads_novo', 0),
+        'em_atendimento': metrics.get('leads_atendimento', 0),
+        'qualificado': metrics.get('leads_qualificado', 0),
+        'ganho': metrics.get('leads_ganhos', 0),
+        'perdido': metrics.get('leads_perdido', 0)
+    }
+
+    conn.close()
     return jsonify(metrics)
+
 
 # =======================
 # LOGS DE AUDITORIA
@@ -386,6 +694,7 @@ def get_audit_log():
 @app.route("/api/tags", methods=["GET"])
 @rate_limit('per_minute')
 @login_required
+@cached(ttl=120, key_prefix="tags")  # ← ADICIONE ESTA LINHA
 def get_all_tags():
     """Retorna todas as tags disponíveis"""
     try:
@@ -424,7 +733,7 @@ def create_tag():
 @app.route("/api/leads/<int:lead_id>/tags", methods=["GET"])
 @rate_limit('per_minute')
 @login_required
-def get_lead_tags(lead_id):
+def get_lead_tags_endpoint(lead_id):
     """Retorna tags de um lead"""
     tags = db.get_lead_tags(lead_id)
     return jsonify(tags)
@@ -450,6 +759,9 @@ def add_tag_to_lead(lead_id):
         db.add_lead_log(lead_id, "tag_adicionada", session["name"], f"Tag ID {tag_id}")
         audit_logger.log_action(session["user_id"], "tag_added_to_lead", "lead", lead_id, f"Tag {tag_id}")
         
+        # 📊 Sincronizar com Google Sheets
+        sync_lead_to_sheets(lead_id)
+        
         return jsonify({"success": True})
     except:
         return jsonify({"error": "Erro ao adicionar tag"}), 500
@@ -470,6 +782,9 @@ def remove_tag_from_lead(lead_id, tag_id):
         
         db.add_lead_log(lead_id, "tag_removida", session["name"], f"Tag ID {tag_id}")
         audit_logger.log_action(session["user_id"], "tag_removed_from_lead", "lead", lead_id, f"Tag {tag_id}")
+        
+        # 📊 Sincronizar com Google Sheets
+        sync_lead_to_sheets(lead_id)
         
         return jsonify({"success": True})
     except:
@@ -541,10 +856,8 @@ def get_sla_alerts():
         return jsonify([])
 
 # =======================
-# WEBHOOK DO WHATSAPP - ✅ VERSÃO CORRIGIDA E COMPATÍVEL
+# WEBHOOK DO WHATSAPP - ✅ COM SINCRONIZAÇÃO SHEETS
 # =======================
-# Substitua o webhook existente (linha ~433 do app.py) por este código
-
 @app.route("/api/webhook/message", methods=["POST"])
 @rate_limit('per_hour')
 @handle_errors
@@ -582,9 +895,29 @@ def webhook_message():
         if not lead:
             print(f"❌ Erro ao criar/buscar lead para {phone}")
             return jsonify({"error": "Erro ao processar lead"}), 500
+        
+        # 🔔 Notificar novo lead
+        notification_service.notify_new_lead(lead, room='gestores')
+
+        # 📊 Sincronizar lead com Google Sheets
+        sync_lead_to_sheets(lead["id"])
 
         # 🔹 Registra mensagem
         db.add_message(lead["id"], "lead", name, content)
+
+        # 🔔 Notificar nova mensagem
+        notification_service.notify_new_message(lead, content, room='gestores')
+        
+        # 📊 Sincronizar mensagem com Google Sheets
+        sync_message_to_sheets({
+            'id': db.get_connection().cursor().lastrowid,
+            'lead_id': lead["id"],
+            'lead_nome': name,
+            'is_from_me': False,
+            'mensagem': content,
+            'timestamp': timestamp,
+            'status': 'recebida'
+        })
 
         # 🔹 Log de histórico
         db.add_lead_log(lead["id"], "mensagem_recebida", name, content[:100])
@@ -603,6 +936,7 @@ def webhook_message():
         print(f"   Lead ID: {lead['id']}")
         print(f"   Nome: {name}")
         print(f"   Telefone: {phone}")
+        print(f"   📊 Sincronizado com Google Sheets")
         print("")
         
         return jsonify({"success": True, "lead_id": lead["id"]}), 200
@@ -673,13 +1007,195 @@ def on_leave(data):
 def health_check():
     """Health check para monitoramento"""
     whatsapp_status = whatsapp.ensure_connected()
+    sheets_status = sheets_service is not None
+    
     return jsonify({
-        "status": "healthy" if whatsapp_status else "degraded",
+        "status": "healthy" if (whatsapp_status and sheets_status) else "degraded",
         "timestamp": datetime.now().isoformat(),
         "services": {
             "database": "ok",
-            "whatsapp": "connected" if whatsapp_status else "disconnected"
+            "whatsapp": "connected" if whatsapp_status else "disconnected",
+            "google_sheets": "connected" if sheets_status else "disconnected"
         }
+    })
+
+# =======================
+# CACHE STATS
+# =======================
+@app.route("/api/cache/stats", methods=["GET"])
+@role_required("admin")
+def cache_stats_endpoint():
+    """Retorna estatísticas do cache"""
+    return jsonify(get_cache_stats())
+
+# =======================
+# SISTEMA DE ALERTAS
+# =======================
+
+@app.route("/api/alerts", methods=["GET"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def get_alerts():
+    """Retorna alertas ativos"""
+    vendedor_id = request.args.get('vendedor_id', type=int)
+    
+    alert_system = AlertSystem(db)
+    alerts = alert_system.get_active_alerts(vendedor_id)
+    
+    return jsonify({
+        "alerts": alerts,
+        "stats": alert_system.get_alert_stats()
+    })
+
+
+@app.route("/api/alerts/<int:alert_id>/resolve", methods=["POST"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def resolve_alert(alert_id):
+    """Marca alerta como resolvido"""
+    alert_system = AlertSystem(db)
+    alert_system.resolve_alert(alert_id)
+    
+    audit_logger.log_action(
+        session["user_id"], 
+        "alert_resolved", 
+        "alert", 
+        alert_id, 
+        "Alerta resolvido"
+    )
+    
+    return jsonify({"success": True})
+
+
+@app.route("/api/alerts/dashboard", methods=["GET"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def get_alerts_dashboard():
+    """Retorna dados do dashboard de alertas"""
+    dashboard_data = alert_monitoring.get_dashboard_data()
+    return jsonify(dashboard_data)
+
+
+@app.route("/api/alerts/check-now", methods=["POST"])
+@rate_limit('per_minute')
+@role_required("admin")
+@handle_errors
+def check_alerts_now():
+    """Força verificação de alertas (apenas admin)"""
+    new_alerts = check_alerts_once(db, socketio, notification_service, whatsapp)  # ← ADICIONE whatsapp
+    
+    return jsonify({
+        "success": True,
+        "alerts_found": len(new_alerts),
+        "alerts": new_alerts
+    })
+
+# =======================
+# CONFIGURAÇÃO WHATSAPP GESTORES
+# =======================
+
+@app.route("/api/gestores/whatsapp-config", methods=["GET"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def get_gestor_whatsapp_config():
+    """Retorna configuração de WhatsApp do gestor"""
+    user_id = session["user_id"]
+    
+    notifier = GestorWhatsAppNotifier(db, whatsapp)
+    config = notifier.get_config(user_id)
+    
+    return jsonify(config if config else {})
+
+
+@app.route("/api/gestores/whatsapp-config", methods=["POST"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@validate_request('phone')
+@handle_errors
+def set_gestor_whatsapp_config():
+    """Configura WhatsApp para receber alertas"""
+    data = request.json
+    user_id = session["user_id"]
+    
+    # Validar telefone
+    phone = data.get("phone", "").strip()
+    if not phone.isdigit() or len(phone) < 10:
+        return jsonify({"error": "Telefone inválido"}), 400
+    
+    notifier = GestorWhatsAppNotifier(db, whatsapp)
+    
+    config_id = notifier.add_gestor_config(
+        user_id=user_id,
+        phone=phone,
+        receive_critical=data.get("receive_critical", True),
+        receive_danger=data.get("receive_danger", True),
+        receive_warning=data.get("receive_warning", False)
+    )
+    
+    audit_logger.log_action(
+        user_id, 
+        "whatsapp_config_updated", 
+        "config", 
+        config_id, 
+        f"WhatsApp configurado: {phone}"
+    )
+    
+    return jsonify({
+        "success": True,
+        "config_id": config_id,
+        "message": "Configuração salva com sucesso!"
+    })
+
+
+@app.route("/api/gestores/whatsapp-config/test", methods=["POST"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def test_gestor_whatsapp():
+    """Envia mensagem de teste para o gestor"""
+    user_id = session["user_id"]
+    
+    notifier = GestorWhatsAppNotifier(db, whatsapp)
+    success = notifier.test_notification(user_id)
+    
+    if success:
+        return jsonify({
+            "success": True,
+            "message": "Mensagem de teste enviada com sucesso!"
+        })
+    else:
+        return jsonify({
+            "success": False,
+            "error": "Falha ao enviar mensagem de teste"
+        }), 500
+
+
+@app.route("/api/gestores/whatsapp-config", methods=["DELETE"])
+@rate_limit('per_minute')
+@role_required("admin", "gestor")
+@handle_errors
+def disable_gestor_whatsapp():
+    """Desativa notificações WhatsApp"""
+    user_id = session["user_id"]
+    
+    notifier = GestorWhatsAppNotifier(db, whatsapp)
+    notifier.disable_config(user_id)
+    
+    audit_logger.log_action(
+        user_id, 
+        "whatsapp_config_disabled", 
+        "config", 
+        user_id, 
+        "Notificações WhatsApp desativadas"
+    )
+    
+    return jsonify({
+        "success": True,
+        "message": "Notificações desativadas"
     })
 
 # =======================
@@ -687,7 +1203,7 @@ def health_check():
 # =======================
 if __name__ == "__main__":
     print("=" * 60)
-    print("🚀 CRM WhatsApp - Versão Otimizada")
+    print("🚀 CRM WhatsApp - Versão Otimizada + Google Sheets")
     print("=" * 60)
     print("✅ Rate Limiting ativado")
     print("✅ Validações de input implementadas")
@@ -696,11 +1212,14 @@ if __name__ == "__main__":
     print("✅ Logs de auditoria ativos")
     print("✅ Cache de performance configurado")
     print("✅ Webhook CORRIGIDO para VenomBot")
+    print("✅ Google Sheets - Sincronização em tempo real")
     print("=" * 60)
     print("🌐 API: http://localhost:5000")
     print("🔌 Socket.io ativo")
     print("📊 Health check: http://localhost:5000/health")
     print("📡 Webhook: http://localhost:5000/api/webhook/message")
+    if sheets_service:
+        print(f"📊 Google Sheets: {sheets_service.get_spreadsheet_url()}")
     print("=" * 60)
 
     socketio.run(app, debug=False, host="0.0.0.0", port=5000)

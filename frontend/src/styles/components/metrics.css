@@ -320,3 +320,180 @@
   background: linear-gradient(90deg, rgba(0,168,255,0.15), rgba(0,168,255,0.05));
   border-left: 3px solid #00a8ff;
 }
+
+
+/* ========================================
+   🆕 MÉTRICAS AVANÇADAS - CSS ADICIONAL
+   ======================================== */
+
+/* ===== SLA COMPLIANCE ===== */
+.sla-summary {
+  display: flex;
+  justify-content: space-around;
+  padding: 20px 0;
+  gap: 20px;
+}
+
+.sla-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  flex: 1;
+  transition: all 0.2s;
+}
+
+.sla-stat:hover {
+  transform: translateY(-2px);
+}
+
+.sla-stat.good {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.sla-stat.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.sla-stat svg {
+  flex-shrink: 0;
+}
+
+.sla-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.sla-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+/* ===== TEMPO DE RESPOSTA POR VENDEDOR ===== */
+.vendedor-response-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.vendedor-response-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border-left: 3px solid;
+  transition: all 0.2s;
+}
+
+.vendedor-response-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vendedor-response-item.good {
+  border-left-color: #10b981;
+}
+
+.vendedor-response-item.warning {
+  border-left-color: #f59e0b;
+}
+
+.vendedor-response-item.danger {
+  border-left-color: #ef4444;
+}
+
+.vendedor-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.vendedor-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.vendedor-time {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.vendedor-bar-container {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vendedor-bar {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.vendedor-response-item.good .vendedor-bar {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.vendedor-response-item.warning .vendedor-bar {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.vendedor-response-item.danger .vendedor-bar {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* ===== EMPTY STATE ===== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 12px;
+}
+
+.empty-state svg {
+  opacity: 0.3;
+}
+
+.empty-state p {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ===== RESPONSIVO ===== */
+@media (max-width: 768px) {
+  .sla-summary {
+    flex-direction: column;
+  }
+
+  .sla-stat {
+    justify-content: center;
+  }
+
+  .vendedor-response-list {
+    padding: 8px 0;
+  }
+
+  .vendedor-response-item {
+    padding: 10px;
+  }
+}

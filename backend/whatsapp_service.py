@@ -54,7 +54,7 @@ class WhatsAppService:
                     data = response.json()
                     self.is_ready = data.get("connected", False)
                     self.last_health_check = datetime.now()
-                    self.connection_errors = 0  # Reset contador de erros
+                    self.connection_errors = 0
                     
                     if self.is_ready:
                         print(f"✅ WhatsApp conectado: {data.get('phone', 'N/A')}")
@@ -130,8 +130,6 @@ class WhatsAppService:
             # Cria ou busca o lead no banco
             lead = self.db.create_or_get_lead(phone, sender_name)
 
-            
-
             # Salva a mensagem recebida
             self.db.add_message(
                 lead_id=lead["id"],
@@ -166,10 +164,10 @@ class WhatsAppService:
             traceback.print_exc()
 
     # =============================
-    # ENVIAR MENSAGEM PARA O LEAD
+    # ENVIAR MENSAGEM (LEAD OU GESTOR)
     # =============================
-    def send_message(self, phone, content, vendedor_id=None):
-        """Envia mensagem para o lead via VenomBot com retry"""
+    def send_message(self, phone, content, vendedor_id=None, bypass_lead_check=False):
+        """Envia mensagem via VenomBot com retry (aceita bypass para gestores)"""
         
         # Validações
         phone = self.validate_phone(phone)
@@ -209,12 +207,12 @@ class WhatsAppService:
                     return False
 
                 lead = self.db.get_lead_by_phone(phone)
-                if not lead:
+
+                # ⚠️ NOVO: permite envio para gestores sem lead
+                if not lead and not bypass_lead_check:
                     print(f"⚠️ Nenhum lead encontrado com o número {phone}. Mensagem não será enviada.")
                     return False
 
-
-                # Busca nome do vendedor
                 vendedor_name = "Vendedor"
                 if vendedor_id:
                     users = self.db.get_all_users()
@@ -222,25 +220,25 @@ class WhatsAppService:
                     if user:
                         vendedor_name = user["name"]
 
-                # Salva mensagem enviada
-                self.db.add_message(
-                    lead_id=lead["id"],
-                    sender_type="vendedor",
-                    sender_name=vendedor_name,
-                    content=content
-                )
+                # Só salva se for lead real
+                if lead:
+                    self.db.add_message(
+                        lead_id=lead["id"],
+                        sender_type="vendedor",
+                        sender_name=vendedor_name,
+                        content=content
+                    )
 
-                # Adiciona log de envio
-                self.db.add_lead_log(
-                    lead_id=lead["id"],
-                    action="mensagem_enviada",
-                    user_name=vendedor_name,
-                    details=content[:100]
-                )
+                    self.db.add_lead_log(
+                        lead_id=lead["id"],
+                        action="mensagem_enviada",
+                        user_name=vendedor_name,
+                        details=content[:100]
+                    )
 
-                # Notifica o front em tempo real
+                # Emite evento de envio para o front-end
                 self.socketio.emit("message_sent", {
-                    "lead_id": lead["id"],
+                    "lead_id": lead["id"] if lead else None,
                     "phone": phone,
                     "content": content,
                     "timestamp": datetime.now().isoformat(),
@@ -248,28 +246,9 @@ class WhatsAppService:
                     "sender_id": vendedor_id
                 })
 
-                print("✅ Mensagem enviada e salva com sucesso")
-
-                
-
+                print("✅ Mensagem enviada com sucesso (lead ou gestor)")
                 return True
 
-            except requests.exceptions.Timeout:
-                print(f"⏱️ Timeout na tentativa {attempt + 1}/{self.max_retries}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
-                else:
-                    print("❌ Timeout: VenomBot não responde.")
-                    return False
-                    
-            except requests.exceptions.ConnectionError:
-                print(f"🔌 Erro de conexão na tentativa {attempt + 1}/{self.max_retries}")
-                if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay)
-                else:
-                    print("❌ VenomBot offline ou inacessível")
-                    return False
-                    
             except Exception as e:
                 print(f"❌ Erro inesperado ao enviar mensagem: {e}")
                 import traceback
