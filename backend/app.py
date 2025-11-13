@@ -21,6 +21,8 @@ from alert_monitoring_service import AlertMonitoringService, check_alerts_once
 from gestor_whatsapp_notifier import GestorWhatsAppNotifier
 import os
 from dotenv import load_dotenv
+from routes.ai_webhook import register_ai_routes
+
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -29,8 +31,12 @@ load_dotenv()
 # CONFIGURAÇÃO PRINCIPAL
 # =======================
 app = Flask(__name__)
+register_ai_routes(app)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fallback-insecure-key-change-immediately")
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", 16 * 1024 * 1024))
+
+
+
 
 # CORS - Usar variável de ambiente para produção
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -942,7 +948,8 @@ def webhook_message():
 
                 if resposta_ia:
                     # Enviar resposta via WhatsApp
-                    success = whatsapp.send_message(phone, resposta_ia, user_id=0)  # user_id=0 = IA
+                    success = whatsapp.send_message(phone, resposta_ia, vendedor_id=0)
+
 
                     if success:
                         # Registrar mensagem da IA no banco
