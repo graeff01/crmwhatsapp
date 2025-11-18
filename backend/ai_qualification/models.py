@@ -1,5 +1,5 @@
 """
-Modelos específicos do módulo de qualificação por IA
+Modelos especÃ­ficos do mÃ³dulo de qualificaÃ§Ã£o por IA
 """
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
@@ -8,7 +8,7 @@ from typing import List, Dict, Optional, Any
 @dataclass
 class QualificationCriteria:
     """
-    Critérios para qualificação de leads
+    CritÃ©rios para qualificaÃ§Ã£o de leads
     Define regras e limites do processo
     """
     required_fields: List[str] = field(default_factory=lambda: ['name', 'phone'])
@@ -16,18 +16,18 @@ class QualificationCriteria:
     max_attempts: int = 5
     timeout_minutes: int = 30
     auto_escalate_keywords: List[str] = field(default_factory=lambda: [
-        'humano', 'atendente', 'pessoa', 'vendedor', 'falar com alguém'
+        'humano', 'atendente', 'pessoa', 'vendedor', 'falar com alguem'
     ])
 
     def validate_collected_data(self, collected_data: Dict[str, Any]) -> bool:
         """
-        Valida se todos os campos obrigatórios foram coletados
+        Valida se todos os campos obrigatÃ³rios foram coletados
 
         Args:
             collected_data: Dados coletados do lead
 
         Returns:
-            True se todos os campos obrigatórios estão presentes e preenchidos
+            True se todos os campos obrigatÃ³rios estÃ£o presentes e preenchidos
         """
         return all(
             field in collected_data and collected_data[field]
@@ -36,10 +36,10 @@ class QualificationCriteria:
 
     def should_escalate_by_keywords(self, message: str) -> bool:
         """
-        Verifica se a mensagem contém palavras-chave para escalação
+        Verifica se a mensagem contÃ©m palavras-chave para escalaÃ§Ã£o
 
         Args:
-            message: Mensagem do usuário
+            message: Mensagem do usuÃ¡rio
 
         Returns:
             True se deve escalar para atendimento humano
@@ -48,7 +48,7 @@ class QualificationCriteria:
         return any(keyword in message_lower for keyword in self.auto_escalate_keywords)
 
     def to_dict(self) -> Dict:
-        """Converte para dicionário"""
+        """Converte para dicionÃ¡rio"""
         return {
             'required_fields': self.required_fields,
             'min_score': self.min_score,
@@ -72,47 +72,47 @@ class QualificationPrompt:
     @classmethod
     def default_for_business(cls, business_type: str = "services") -> "QualificationPrompt":
         """
-        Retorna prompts padrão para um tipo de negócio
+        Retorna prompts padrÃ£o para um tipo de negÃ³cio
 
         Args:
-            business_type: Tipo de negócio (services, ecommerce, b2b, real_estate)
+            business_type: Tipo de negÃ³cio (services, ecommerce, b2b, real_estate)
 
         Returns:
             QualificationPrompt configurado
         """
         prompts = {
             "services": cls(
-                system_prompt="""Você é um assistente de qualificação de leads para uma empresa de serviços.
-Seu objetivo é coletar informações do lead de forma natural e amigável:
+                system_prompt="""VocÃª Ã© um assistente de qualificaÃ§Ã£o de leads para uma empresa de serviÃ§os.
+Seu objetivo Ã© coletar informaÃ§Ãµes do lead de forma natural e amigÃ¡vel:
 - Nome
 - Telefone
-- Tipo de serviço de interesse
-- Localização (se aplicável)
-- Urgência/prazo
+- Tipo de serviÃ§o de interesse
+- LocalizaÃ§Ã£o (se aplicÃ¡vel)
+- UrgÃªncia/prazo
 
 Seja cordial, objetivo e profissional.""",
-                greeting_template="Olá! Bem-vindo(a) à {company_name}. Como posso ajudá-lo(a) hoje?",
-                qualification_template="Ótimo! Para te atender melhor, preciso de algumas informações...",
-                escalation_template="Entendo. Vou transferir você para um de nossos especialistas que poderá te ajudar melhor!",
-                completion_template="Obrigado pelas informações! Em breve entraremos em contato."
+                greeting_template="OlÃ¡! Bem-vindo(a) Ã  {company_name}. Como posso ajudÃ¡-lo(a) hoje?",
+                qualification_template="Ã“timo! Para te atender melhor, preciso de algumas informaÃ§Ãµes...",
+                escalation_template="Entendo. Vou transferir vocÃª para um de nossos especialistas que poderÃ¡ te ajudar melhor!",
+                completion_template="Obrigado pelas informaÃ§Ãµes! Em breve entraremos em contato."
             ),
             "ecommerce": cls(
-                system_prompt="""Você é um assistente de vendas para um e-commerce.
-Colete informações sobre:
+                system_prompt="""VocÃª Ã© um assistente de vendas para um e-commerce.
+Colete informaÃ§Ãµes sobre:
 - Nome
 - Telefone/Email
 - Produto de interesse
 - Quantidade
 - Forma de pagamento preferida
 
-Seja solícito e mostre entusiasmo pelos produtos.""",
-                greeting_template="Olá! Bem-vindo(a) à nossa loja! O que você procura hoje?",
+Seja solÃ­cito e mostre entusiasmo pelos produtos.""",
+                greeting_template="OlÃ¡! Bem-vindo(a) Ã  nossa loja! O que vocÃª procura hoje?",
                 qualification_template="Perfeito! Vou te ajudar a finalizar seu pedido...",
-                escalation_template="Vou conectar você com nossa equipe de vendas para finalizar!",
-                completion_template="Pedido registrado! Logo nossa equipe entrará em contato."
+                escalation_template="Vou conectar vocÃª com nossa equipe de vendas para finalizar!",
+                completion_template="Pedido registrado! Logo nossa equipe entrarÃ¡ em contato."
             ),
             "b2b": cls(
-                system_prompt="""Você é um assistente de prospecção B2B.
+                system_prompt="""VocÃª Ã© um assistente de prospecÃ§Ã£o B2B.
 Colete:
 - Nome do contato
 - Empresa
@@ -121,27 +121,27 @@ Colete:
 - Desafio ou necessidade
 - Tamanho da empresa
 
-Seja profissional e focado em valor de negócio.""",
-                greeting_template="Olá! Obrigado pelo interesse em nossa solução. Qual seu nome?",
-                qualification_template="Ótimo! Para preparar uma proposta adequada...",
-                escalation_template="Vou agendar uma reunião com nosso consultor especializado!",
-                completion_template="Informações registradas! Retornaremos em até 24h."
+Seja profissional e focado em valor de negÃ³cio.""",
+                greeting_template="OlÃ¡! Obrigado pelo interesse em nossa soluÃ§Ã£o. Qual seu nome?",
+                qualification_template="Ã“timo! Para preparar uma proposta adequada...",
+                escalation_template="Vou agendar uma reuniÃ£o com nosso consultor especializado!",
+                completion_template="InformaÃ§Ãµes registradas! Retornaremos em atÃ© 24h."
             ),
             "real_estate": cls(
-                system_prompt="""Você é um assistente para imobiliária.
+                system_prompt="""VocÃª Ã© um assistente para imobiliÃ¡ria.
 Colete:
 - Nome
 - Telefone
-- Tipo de imóvel (compra/aluguel)
-- Localização desejada
-- Faixa de preço/orçamento
-- Número de quartos
+- Tipo de imÃ³vel (compra/aluguel)
+- LocalizaÃ§Ã£o desejada
+- Faixa de preÃ§o/orÃ§amento
+- NÃºmero de quartos
 
 Seja consultivo e entusiasta.""",
-                greeting_template="Olá! Procurando o imóvel ideal? Vamos encontrá-lo juntos!",
-                qualification_template="Perfeito! Vou buscar as melhores opções para você...",
-                escalation_template="Vou te conectar com um corretor especializado na região!",
-                completion_template="Ótimo! Logo teremos novidades sobre imóveis disponíveis."
+                greeting_template="OlÃ¡! Procurando o imÃ³vel ideal? Vamos encontrÃ¡-lo juntos!",
+                qualification_template="Perfeito! Vou buscar as melhores opÃ§Ãµes para vocÃª...",
+                escalation_template="Vou te conectar com um corretor especializado na regiÃ£o!",
+                completion_template="Ã“timo! Logo teremos novidades sobre imÃ³veis disponÃ­veis."
             )
         }
 

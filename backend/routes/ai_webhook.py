@@ -7,11 +7,11 @@ from typing import Dict
 import asyncio
 import os
 
-from ..ai_qualification.engine import QualificationEngine
-from ..ai_qualification.providers.openai_provider import OpenAIProvider
-from ..ai_qualification.models import QualificationCriteria
-from ..services.lead_service import LeadService
-from ..whatsapp_service import WhatsAppService
+from ai_qualification.engine import QualificationEngine
+from ai_qualification.providers.openai_provider import OpenAIProvider
+from ai_qualification.models import QualificationCriteria
+from services.lead_service import LeadService
+from whatsapp_service import WhatsAppService
 
 # Blueprint
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
