@@ -1,77 +1,41 @@
-# Core Flask
+# ================================
+# DEPENDÊNCIAS DE PRODUÇÃO
+# CRM WhatsApp - Backend Python/Flask
+# ================================
+
+# ===== Core Flask =====
 Flask==3.0.0
 Flask-SocketIO==5.3.5
 Flask-CORS==4.0.0
+Flask-Limiter==3.5.0
 python-socketio==5.10.0
 eventlet==0.33.3
 
-# Segurança
+# ===== Segurança =====
 bcrypt==4.1.2
+cryptography==41.0.7
 python-dotenv==1.0.0
 
-# Google Sheets Integration
+# ===== Google Sheets Integration =====
 google-auth==2.25.2
 google-api-python-client==2.110.0
 
-# HTTP Requests
+# ===== HTTP & Async =====
 requests==2.31.0
+aiohttp==3.9.0
 
-# IA Assistant
+# ===== IA & LLM =====
+# Usando versão mais recente do OpenAI
 openai==1.54.3
 
-# IA / LLM
-openai==1.3.0
-
-# Async Support
-aiohttp==3.9.0
-
-# Se ainda não tiver:
-python-dotenv==1.0.0
-
-
-# ================================
-# SISTEMA DE QUALIFICAÇÃO IA - CRM
-# Dependências Python
-# ================================
-
-# Framework Web
-flask==3.0.0
-flask-cors==4.0.0
-
-# IA / LLM
-openai==1.3.0
-
-# Async Support
-aiohttp==3.9.0
-asyncio==3.4.3
-
-# Database (Opcional)
-# psycopg2-binary==2.9.9  # PostgreSQL
-# pymongo==4.5.0          # MongoDB
-
-# Cache (Opcional)
-# redis==5.0.1
-
-# WhatsApp (já tem Baileys no projeto)
-# requests==2.31.0
-
-# Utilities
-python-dotenv==1.0.0
+# ===== Utilities =====
 pydantic==2.5.0
-
-# Logging e Monitoramento
 python-json-logger==2.0.7
 
-# Segurança
-cryptography==41.0.7
+# ===== Database (Opcional - PostgreSQL para produção) =====
+# Descomente quando migrar de SQLite para PostgreSQL
+# psycopg2-binary==2.9.9
 
-# Rate Limiting
-flask-limiter==3.5.0
-
-# Testing (Desenvolvimento)
-pytest==7.4.3
-pytest-asyncio==0.21.1
-
-# Code Quality (Desenvolvimento)
-black==23.12.0
-flake8==6.1.0
+# ===== Cache (Opcional - Redis para produção) =====
+# Descomente quando implementar cache distribuído
+# redis==5.0.1

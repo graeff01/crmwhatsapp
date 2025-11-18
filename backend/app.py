@@ -22,6 +22,7 @@ from gestor_whatsapp_notifier import GestorWhatsAppNotifier
 import os
 from dotenv import load_dotenv
 from routes.ai_webhook import register_ai_routes
+from config import config
 
 
 # Carregar variáveis de ambiente
@@ -31,18 +32,23 @@ load_dotenv()
 # CONFIGURAÇÃO PRINCIPAL
 # =======================
 app = Flask(__name__)
+
+# Usa configurações centralizadas do config.py
+app.config["SECRET_KEY"] = config.SECRET_KEY
+app.config["DEBUG"] = config.DEBUG
+app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
+
+# Registra rotas de IA
 register_ai_routes(app)
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "fallback-insecure-key-change-immediately")
-app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH", 16 * 1024 * 1024))
 
+# CORS - Usa configuração centralizada
+CORS(app, supports_credentials=True, origins=config.CORS_ORIGINS)
 
-
-
-# CORS - Usar variável de ambiente para produção
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-CORS(app, supports_credentials=True, origins=cors_origins)
-
-socketio = SocketIO(app, cors_allowed_origins=cors_origins, async_mode="threading")
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=config.CORS_ORIGINS,
+    async_mode=config.SOCKETIO_ASYNC_MODE
+)
 
 # Inicializar serviço de notificações
 notification_service = NotificationService(socketio)

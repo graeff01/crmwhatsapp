@@ -184,14 +184,28 @@ class InputValidator:
     
     @staticmethod
     def sanitize_html(text):
-        """Remove tags HTML perigosas"""
+        """
+        Remove tags HTML perigosas usando escape
+        Para HTML mais complexo, considere usar a biblioteca bleach
+        """
         if not text:
             return text
-        
-        # Remove tags HTML básicas
-        text = re.sub(r'<script.*?</script>', '', text, flags=re.DOTALL | re.IGNORECASE)
-        text = re.sub(r'<.*?>', '', text)
-        
+
+        # Escapa caracteres HTML perigosos
+        import html
+        text = html.escape(str(text))
+
+        # Remove sequências de script comuns
+        dangerous_patterns = [
+            r'javascript:',
+            r'on\w+\s*=',  # onclick, onerror, etc
+            r'<script',
+            r'</script>',
+        ]
+
+        for pattern in dangerous_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
         return text
 
 
@@ -241,15 +255,17 @@ def handle_errors(f):
         try:
             return f(*args, **kwargs)
         except ValueError as e:
-            print(f"⚠️ Erro de validação: {e}")
+            import logging
+            logging.warning(f"Erro de validação: {e}")
             return jsonify({"error": str(e)}), 400
         except PermissionError as e:
-            print(f"🚫 Erro de permissão: {e}")
+            import logging
+            logging.error(f"Erro de permissão: {e}")
             return jsonify({"error": "Sem permissão para esta ação"}), 403
         except Exception as e:
-            print(f"❌ Erro interno: {e}")
+            import logging
             import traceback
-            traceback.print_exc()
+            logging.error(f"Erro interno: {e}\n{traceback.format_exc()}")
             return jsonify({"error": "Erro interno do servidor"}), 500
     return decorated_function
 
@@ -275,16 +291,26 @@ class AuditLogger:
             details: Detalhes adicionais
         """
         try:
-            # Aqui você pode implementar a lógica de salvar no banco
-            # ou enviar para um serviço de logging externo
+            import logging
             timestamp = datetime.now().isoformat()
-            print(f"📝 AUDIT: [{timestamp}] User {user_id} - {action} {entity_type} #{entity_id} - {details}")
-            
-            # Opcional: salvar no banco de dados
-            # self.db.save_audit_log(...)
-            
+            audit_message = f"User {user_id} - {action} {entity_type} #{entity_id} - {details}"
+
+            # Log estruturado para auditoria
+            logging.info(f"AUDIT: {audit_message}", extra={
+                'user_id': user_id,
+                'action': action,
+                'entity_type': entity_type,
+                'entity_id': entity_id,
+                'details': details,
+                'timestamp': timestamp
+            })
+
+            # TODO: Implementar persistência no banco de dados
+            # self.db.save_audit_log(user_id, action, entity_type, entity_id, details, timestamp)
+
         except Exception as e:
-            print(f"❌ Erro ao registrar log de auditoria: {e}")
+            import logging
+            logging.error(f"Erro ao registrar log de auditoria: {e}")
 
 
 # =============================
