@@ -3,7 +3,7 @@ Regras de negócio para qualificação de leads
 Centraliza lógica de decisão e scoring
 """
 from typing import Dict, List, Optional
-from ..models import LeadConversation, QualificationStatus
+from ai_qualification.models import LeadConversation, QualificationStatus
 
 
 class QualificationRules:
