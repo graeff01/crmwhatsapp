@@ -16,25 +16,61 @@ from services.whatsapp_service import WhatsAppService
 # Blueprint
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')
 
-# Inicializa engine (em produção, usar factory pattern)
-ai_provider = OpenAIProvider(
-    api_key=os.getenv('OPENAI_API_KEY'),
-    model=os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
-)
+# Variáveis globais para lazy initialization
+ai_provider = None
+qualification_engine = None
+lead_service = None
+whatsapp_service = None
 
-qualification_engine = QualificationEngine(
-    ai_provider=ai_provider,
-    business_type=os.getenv('BUSINESS_TYPE', 'services'),
-    qualification_criteria=QualificationCriteria(
-        required_fields=['name', 'phone', 'interest'],
-        min_score=50,
-        max_attempts=5
-    )
-)
 
-# Serviços
-lead_service = LeadService()
-whatsapp_service = WhatsAppService()
+def get_ai_provider():
+    """Inicializa AI Provider (lazy)"""
+    global ai_provider
+    if ai_provider is None:
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY não configurada. "
+                "Configure no arquivo .env para usar o sistema de IA."
+            )
+
+        ai_provider = OpenAIProvider(
+            api_key=api_key,
+            model=os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+        )
+    return ai_provider
+
+
+def get_qualification_engine():
+    """Inicializa Qualification Engine (lazy)"""
+    global qualification_engine
+    if qualification_engine is None:
+        qualification_engine = QualificationEngine(
+            ai_provider=get_ai_provider(),
+            business_type=os.getenv('BUSINESS_TYPE', 'services'),
+            qualification_criteria=QualificationCriteria(
+                required_fields=['name', 'phone', 'interest'],
+                min_score=50,
+                max_attempts=5
+            )
+        )
+    return qualification_engine
+
+
+def get_lead_service():
+    """Inicializa Lead Service (lazy)"""
+    global lead_service
+    if lead_service is None:
+        lead_service = LeadService()
+    return lead_service
+
+
+def get_whatsapp_service():
+    """Inicializa WhatsApp Service (lazy)"""
+    global whatsapp_service
+    if whatsapp_service is None:
+        whatsapp_service = WhatsAppService()
+    return whatsapp_service
 
 
 @ai_bp.route('/webhook/whatsapp', methods=['POST'])
@@ -56,23 +92,26 @@ async def whatsapp_webhook():
         phone = data['phone']
         message = data['message']
         contact_name = data.get('name', '')
-        
+
         # Processa mensagem via IA
-        result = await qualification_engine.process_message(
+        engine = get_qualification_engine()
+        result = await engine.process_message(
             phone=phone,
             message=message,
             metadata={'contact_name': contact_name}
         )
-        
+
         # Envia resposta via WhatsApp
-        await whatsapp_service.send_message(
+        whatsapp = get_whatsapp_service()
+        await whatsapp.send_message(
             phone=phone,
             message=result['response']
         )
-        
+
         # Se qualificado ou escalado, envia para CRM
         if result.get('should_send_to_crm'):
-            crm_lead = await lead_service.create_from_ai_qualification(
+            lead_svc = get_lead_service()
+            crm_lead = await lead_svc.create_from_ai_qualification(
                 result['crm_data']
             )
             result['crm_lead_id'] = crm_lead['id']
@@ -96,7 +135,8 @@ async def whatsapp_webhook():
 def get_stats():
     """Retorna estatísticas do sistema de qualificação"""
     try:
-        stats = qualification_engine.get_stats()
+        engine = get_qualification_engine()
+        stats = engine.get_stats()
         return jsonify({
             'success': True,
             'stats': stats
@@ -112,16 +152,17 @@ def get_stats():
 def get_active_conversations():
     """Lista conversas ativas"""
     try:
+        engine = get_qualification_engine()
         conversations = []
-        for phone, conv in qualification_engine.active_conversations.items():
+        for phone, conv in engine.active_conversations.items():
             conversations.append({
                 'phone': phone,
                 'status': conv.status.value,
-                'score': conv.qualification_score,
+                'score': conv.score,
                 'attempts': conv.attempts,
                 'collected_data': conv.collected_data,
                 'messages_count': len(conv.messages),
-                'started_at': conv.started_at.isoformat()
+                'started_at': conv.started_at
             })
         
         return jsonify({
@@ -140,7 +181,8 @@ def get_active_conversations():
 def get_conversation(phone: str):
     """Obtém detalhes de uma conversa específica"""
     try:
-        conversation = qualification_engine.get_conversation(phone)
+        engine = get_qualification_engine()
+        conversation = engine.get_conversation(phone)
         
         if not conversation:
             return jsonify({
@@ -153,12 +195,15 @@ def get_conversation(phone: str):
             'conversation': {
                 'phone': conversation.phone,
                 'status': conversation.status.value,
-                'score': conversation.qualification_score,
+                'score': conversation.score,
                 'attempts': conversation.attempts,
                 'collected_data': conversation.collected_data,
-                'messages': conversation.get_conversation_history(),
+                'messages': [
+                    {'role': m.role, 'content': m.content, 'timestamp': m.timestamp}
+                    for m in conversation.messages
+                ],
                 'notes': conversation.notes,
-                'started_at': conversation.started_at.isoformat()
+                'started_at': conversation.started_at
             }
         })
     except Exception as e:
@@ -172,10 +217,11 @@ def get_conversation(phone: str):
 def end_conversation(phone: str):
     """Encerra uma conversa manualmente"""
     try:
+        engine = get_qualification_engine()
         data = request.json or {}
         reason = data.get('reason', 'Manual')
-        
-        qualification_engine.end_conversation(phone, reason)
+
+        engine.end_conversation(phone, reason)
         
         return jsonify({
             'success': True,
@@ -192,26 +238,29 @@ def end_conversation(phone: str):
 async def escalate_conversation(phone: str):
     """Escala conversa para atendimento humano manualmente"""
     try:
-        conversation = qualification_engine.get_conversation(phone)
-        
+        engine = get_qualification_engine()
+        conversation = engine.get_conversation(phone)
+
         if not conversation:
             return jsonify({
                 'success': False,
                 'error': 'Conversa não encontrada'
             }), 404
-        
+
         # Força escalação
-        result = await qualification_engine._handle_escalation(conversation)
-        
+        result = await engine._handle_escalation(conversation)
+
         # Envia mensagem de escalação
-        await whatsapp_service.send_message(
+        whatsapp = get_whatsapp_service()
+        await whatsapp.send_message(
             phone=phone,
             message=result['response']
         )
-        
+
         # Cria lead no CRM
         if result.get('should_send_to_crm'):
-            crm_lead = await lead_service.create_from_ai_qualification(
+            lead_svc = get_lead_service()
+            crm_lead = await lead_svc.create_from_ai_qualification(
                 result['crm_data']
             )
             result['crm_lead_id'] = crm_lead['id']
@@ -235,15 +284,16 @@ async def test_qualification():
     Útil para desenvolvimento e testes
     """
     try:
+        engine = get_qualification_engine()
         data = request.json
-        
+
         if not data or 'phone' not in data or 'message' not in data:
             return jsonify({
                 'success': False,
                 'error': 'Envie phone e message'
             }), 400
-        
-        result = await qualification_engine.process_message(
+
+        result = await engine.process_message(
             phone=data['phone'],
             message=data['message'],
             metadata=data.get('metadata', {})
@@ -263,31 +313,33 @@ async def test_qualification():
 @ai_bp.route('/config', methods=['GET', 'PUT'])
 def manage_config():
     """Gerencia configurações do sistema de IA"""
+    engine = get_qualification_engine()
+
     if request.method == 'GET':
         return jsonify({
             'success': True,
             'config': {
-                'business_type': qualification_engine.business_type,
-                'model': qualification_engine.ai_provider.model,
-                'min_score': qualification_engine.criteria.min_score,
-                'max_attempts': qualification_engine.criteria.max_attempts,
-                'required_fields': qualification_engine.criteria.required_fields
+                'business_type': engine.business_type,
+                'model': engine.ai_provider.model,
+                'min_score': engine.criteria.min_score,
+                'max_attempts': engine.criteria.max_attempts,
+                'required_fields': engine.criteria.required_fields
             }
         })
-    
+
     else:  # PUT
         try:
             data = request.json
-            
+
             # Atualiza configurações (em produção, persistir em DB)
             if 'min_score' in data:
-                qualification_engine.criteria.min_score = data['min_score']
-            
+                engine.criteria.min_score = data['min_score']
+
             if 'max_attempts' in data:
-                qualification_engine.criteria.max_attempts = data['max_attempts']
-            
+                engine.criteria.max_attempts = data['max_attempts']
+
             if 'business_type' in data:
-                qualification_engine.business_type = data['business_type']
+                engine.business_type = data['business_type']
             
             return jsonify({
                 'success': True,
