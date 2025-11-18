@@ -21,7 +21,6 @@ from alert_monitoring_service import AlertMonitoringService, check_alerts_once
 from gestor_whatsapp_notifier import GestorWhatsAppNotifier
 import os
 from dotenv import load_dotenv
-from routes.ai_webhook import register_ai_routes
 from config import config
 
 
@@ -38,8 +37,14 @@ app.config["SECRET_KEY"] = config.SECRET_KEY
 app.config["DEBUG"] = config.DEBUG
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_CONTENT_LENGTH
 
-# Registra rotas de IA
-register_ai_routes(app)
+# Registra rotas de IA (opcional - só se OpenAI estiver configurado)
+try:
+    from routes.ai_webhook import register_ai_routes
+    register_ai_routes(app)
+    print("✓ Sistema de IA carregado com sucesso")
+except Exception as e:
+    print(f"⚠ Sistema de IA não carregado: {str(e)}")
+    print("  Configure OPENAI_API_KEY no .env para habilitar")
 
 # CORS - Usa configuração centralizada
 CORS(app, supports_credentials=True, origins=config.CORS_ORIGINS)
