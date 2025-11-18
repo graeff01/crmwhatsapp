@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🚀 CRM WhatsApp Multi-Atendente - MVP
 
 Sistema de CRM com interface compartilhada de WhatsApp onde múltiplos vendedores podem atender leads através de um único número.
@@ -136,7 +135,7 @@ Ou crie um arquivo `test_message.html` com este código:
 
 1. **Lead envia mensagem** (simulada ou real quando integrar VenomBot)
 2. **Mensagem cai na aba "Fila"** (leads não atribuídos)
-3. **Vendedor clica em "Pegar Lead"** 
+3. **Vendedor clica em "Pegar Lead"**
 4. **Lead vai para aba "Meus Leads"** com status "Em Atendimento"
 5. **Vendedor conversa** através da interface
 6. **Lead sempre vê o mesmo número** respondendo
@@ -228,8 +227,5 @@ Dúvidas ou problemas? Me chama que eu te ajudo a configurar!
 
 ---
 
-**Desenvolvido para**: Veloce - Agência Digital  
+**Desenvolvido para**: Veloce - Agência Digital
 **Objetivo**: MVP funcional para testar fluxo multi-atendente antes de integrar WhatsApp Business API oficial
-=======
-# crmwhatsapp
->>>>>>> 5b044837e24ce04c320a3d1530e5f6168594321c

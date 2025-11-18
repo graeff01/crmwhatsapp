@@ -11,7 +11,7 @@ from ..ai_qualification.engine import QualificationEngine
 from ..ai_qualification.providers.openai_provider import OpenAIProvider
 from ..ai_qualification.models import QualificationCriteria
 from ..services.lead_service import LeadService
-from ..services.whatsapp_service import WhatsAppService
+from ..whatsapp_service import WhatsAppService
 
 # Blueprint
 ai_bp = Blueprint('ai', __name__, url_prefix='/api/ai')

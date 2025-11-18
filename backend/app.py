@@ -9,7 +9,6 @@ from middlewares import (
     InputValidator, add_security_headers, AuditLogger
 )
 from utils import Paginator, MessageSearcher, LeadSearcher, PerformanceCache
-import asyncio
 from functools import wraps
 from database_tags_sla import extend_database_with_tags_sla
 from database_ia import extend_database_with_ia
@@ -526,7 +525,6 @@ def get_lead_logs(lead_id):
 # ========================================
 
 from datetime import datetime, timedelta
-from collections import defaultdict
 
 @app.route('/api/metrics', methods=['GET'])
 @login_required
