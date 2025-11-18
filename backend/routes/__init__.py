@@ -20,6 +20,7 @@ def register_blueprints(app):
     from .whatsapp import whatsapp_bp
     from .alerts import alerts_bp
     from .gestor import gestor_bp
+    from .ai_dashboard import ai_dashboard_bp
     from .health import health_bp
 
     # Registra blueprints
@@ -30,6 +31,7 @@ def register_blueprints(app):
     app.register_blueprint(whatsapp_bp)
     app.register_blueprint(alerts_bp)
     app.register_blueprint(gestor_bp)
+    app.register_blueprint(ai_dashboard_bp)
     app.register_blueprint(health_bp)
 
 

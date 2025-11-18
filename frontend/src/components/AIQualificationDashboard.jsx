@@ -5,10 +5,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Phone, MessageCircle, TrendingUp, Users, 
-  CheckCircle, XCircle, AlertCircle, Clock 
+import {
+  Phone, MessageCircle, TrendingUp, Users,
+  CheckCircle, XCircle, AlertCircle, Clock
 } from 'lucide-react';
+import api from '../api';
+import { toast } from './Toast';
 
 const AIQualificationDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -19,7 +21,7 @@ const AIQualificationDashboard = () => {
   // Carrega dados
   useEffect(() => {
     loadDashboardData();
-    
+
     // Atualiza a cada 10 segundos
     const interval = setInterval(loadDashboardData, 10000);
     return () => clearInterval(interval);
@@ -28,18 +30,17 @@ const AIQualificationDashboard = () => {
   const loadDashboardData = async () => {
     try {
       // Carrega estatísticas
-      const statsRes = await fetch('/api/ai/stats');
-      const statsData = await statsRes.json();
+      const statsData = await api.getAIStats();
       setStats(statsData.stats);
 
       // Carrega conversas ativas
-      const convsRes = await fetch('/api/ai/conversations/active');
-      const convsData = await convsRes.json();
+      const convsData = await api.getAIActiveConversations();
       setActiveConversations(convsData.conversations);
 
       setLoading(false);
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
+      toast.error('Erro ao carregar dados do dashboard');
     }
   };
 
@@ -47,16 +48,11 @@ const AIQualificationDashboard = () => {
     if (!confirm('Deseja escalar esta conversa para atendimento humano?')) return;
 
     try {
-      const response = await fetch(`/api/ai/conversations/${phone}/escalate`, {
-        method: 'POST'
-      });
-
-      if (response.ok) {
-        alert('Conversa escalada com sucesso!');
-        loadDashboardData();
-      }
+      await api.escalateAIConversation(phone);
+      toast.success('Conversa escalada com sucesso!');
+      loadDashboardData();
     } catch (error) {
-      alert('Erro ao escalar conversa');
+      toast.error('Erro ao escalar conversa');
     }
   };
 
@@ -64,28 +60,20 @@ const AIQualificationDashboard = () => {
     if (!confirm('Deseja encerrar esta conversa?')) return;
 
     try {
-      const response = await fetch(`/api/ai/conversations/${phone}/end`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Manual' })
-      });
-
-      if (response.ok) {
-        alert('Conversa encerrada');
-        loadDashboardData();
-      }
+      await api.endAIConversation(phone, 'Manual');
+      toast.success('Conversa encerrada');
+      loadDashboardData();
     } catch (error) {
-      alert('Erro ao encerrar conversa');
+      toast.error('Erro ao encerrar conversa');
     }
   };
 
   const viewConversationDetails = async (phone) => {
     try {
-      const response = await fetch(`/api/ai/conversations/${phone}`);
-      const data = await response.json();
+      const data = await api.getAIConversation(phone);
       setSelectedConversation(data.conversation);
     } catch (error) {
-      alert('Erro ao carregar detalhes');
+      toast.error('Erro ao carregar detalhes');
     }
   };
 

@@ -75,6 +75,9 @@ message_searcher = MessageSearcher(db)
 lead_searcher = LeadSearcher(db)
 cache = PerformanceCache(ttl_seconds=300)
 
+# 📱 Inicializar sistema de notificações para gestores
+gestor_notifier = GestorWhatsAppNotifier(db, whatsapp)
+
 print("🚀 CRM WhatsApp iniciado com todas as melhorias!")
 
 # 🚨 Inicializar sistema de alertas
@@ -88,6 +91,13 @@ alert_monitoring = AlertMonitoringService(
 
 # Iniciar monitoramento em background
 alert_monitoring.start()
+
+# 🔗 Inicializar Blueprints com dependências
+from routes.gestor import init_gestor_routes
+from routes.ai_dashboard import init_ai_dashboard_routes
+
+init_gestor_routes(db, whatsapp, gestor_notifier)
+init_ai_dashboard_routes(db, ia_assistant)
 
 # =======================
 # MIDDLEWARE GLOBAL

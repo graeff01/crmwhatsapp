@@ -5,6 +5,9 @@ Envia alertas automáticos via WhatsApp quando detecta problemas críticos
 
 from datetime import datetime
 from typing import List, Dict, Any
+from logger import get_logger, audit_logger
+
+logger = get_logger('gestor_notifier')
 
 
 class GestorWhatsAppNotifier:
@@ -62,8 +65,8 @@ class GestorWhatsAppNotifier:
         
         conn.commit()
         conn.close()
-        
-        print("✅ Tabela de configuração de gestores criada")
+
+        logger.info("Tabela de configuração de gestores criada")
     
     def add_gestor_config(self, user_id: int, phone: str, 
                          receive_critical: bool = True,
@@ -159,9 +162,9 @@ class GestorWhatsAppNotifier:
             return []
         
         gestores = self.get_gestores_to_notify(severity)
-        
+
         if not gestores:
-            print(f"⚠️ Nenhum gestor configurado para receber alertas {severity}")
+            logger.warning(f"Nenhum gestor configurado para receber alertas", extra={"severity": severity})
             return []
         
         message = self._build_alert_message(alert)
@@ -182,14 +185,25 @@ class GestorWhatsAppNotifier:
                     'phone': gestor['phone'],
                     'success': success
                 })
-                
+
                 if success:
-                    print(f"✅ Alerta enviado para {gestor['gestor_name']} ({gestor['phone']})")
+                    logger.info("Alerta enviado com sucesso", extra={
+                        "gestor_name": gestor['gestor_name'],
+                        "phone": gestor['phone'],
+                        "alert_type": alert.get('alert_type')
+                    })
                 else:
-                    print(f"❌ Falha ao enviar para {gestor['gestor_name']}")
+                    logger.error("Falha ao enviar alerta", extra={
+                        "gestor_name": gestor['gestor_name'],
+                        "phone": gestor['phone']
+                    })
             
             except Exception as e:
-                print(f"❌ Erro ao notificar {gestor['gestor_name']}: {e}")
+                logger.exception("Erro ao notificar gestor", extra={
+                    "gestor_name": gestor['gestor_name'],
+                    "phone": gestor['phone'],
+                    "error": str(e)
+                })
                 results.append({
                     'gestor_id': gestor['user_id'],
                     'gestor_name': gestor['gestor_name'],
@@ -279,9 +293,9 @@ class GestorWhatsAppNotifier:
         
         result = c.fetchone()
         conn.close()
-        
+
         if not result:
-            print(f"❌ Gestor {gestor_id} não tem WhatsApp configurado")
+            logger.warning("Gestor sem WhatsApp configurado", extra={"gestor_id": gestor_id})
             return False
         
         # Converter para dict
@@ -304,12 +318,19 @@ Você está configurado para receber alertas críticos e urgentes do sistema.
             vendedor_id=gestor_id,
             bypass_lead_check=True
         )
-        
+
         if success:
-            print(f"✅ Mensagem de teste enviada para {gestor_config['name']}")
+            audit_logger.info("Mensagem de teste enviada", extra={
+                "gestor_id": gestor_id,
+                "gestor_name": gestor_config['name'],
+                "phone": gestor_config['phone']
+            })
         else:
-            print(f"❌ Falha ao enviar teste para {gestor_config['name']}")
-        
+            logger.error("Falha ao enviar mensagem de teste", extra={
+                "gestor_id": gestor_id,
+                "gestor_name": gestor_config['name']
+            })
+
         return success
     
     def get_config(self, user_id: int) -> Dict[str, Any]:

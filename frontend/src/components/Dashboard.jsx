@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Users, Send, LogOut } from 'lucide-react';
+import { MessageCircle, Users, Send, LogOut, Bot, Bell } from 'lucide-react';
 import api from '../api';
 import io from 'socket.io-client';
 import UserManagement from './UserManagement';
 import Metrics from './Metrics';
 import Kanban from './Kanban';
+import AIQualificationDashboard from './AIQualificationDashboard';
+import GestorNotifications from './GestorNotifications';
 import { ToastManager, toast } from './Toast';
 import LeadTimeline from "./LeadTimeline";
 import NotificationsContainer from './NotificationsContainer';
@@ -209,7 +211,7 @@ export default function Dashboard({ user, onLogout }) {
       <audio ref={newMessageSound} src="/sounds/new_message.mp3" preload="auto" />
 
       {/* ==== MODO GERENCIAL ==== */}
-      {['kanban', 'metricas', 'config'].includes(activeTab) ? (
+      {['kanban', 'metricas', 'ia-dashboard', 'notificacoes', 'config'].includes(activeTab) ? (
         <div className="dashboard-layout">
           
           {/* ==== SIDEBAR FIXA ==== */}
@@ -251,6 +253,18 @@ export default function Dashboard({ user, onLogout }) {
                       📊 Métricas
                     </button>
                     <button
+                      className={`sidebar-item ${activeTab === 'ia-dashboard' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('ia-dashboard')}
+                    >
+                      <Bot size={16} /> IA Dashboard
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'notificacoes' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('notificacoes')}
+                    >
+                      <Bell size={16} /> Notificações
+                    </button>
+                    <button
                       className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}
                       onClick={() => setActiveTab('config')}
                     >
@@ -274,6 +288,8 @@ export default function Dashboard({ user, onLogout }) {
               <Kanban user={user} onOpenLead={(lead) => setFromKanbanLead(lead)} />
             )}
             {activeTab === 'metricas' && <Metrics currentUser={user} />}
+            {activeTab === 'ia-dashboard' && <AIQualificationDashboard />}
+            {activeTab === 'notificacoes' && <GestorNotifications currentUser={user} />}
             {activeTab === 'config' && <UserManagement currentUser={user} />}
           </main>
 
@@ -311,6 +327,18 @@ export default function Dashboard({ user, onLogout }) {
                       onClick={() => setActiveTab('metricas')}
                     >
                       📊 Métricas
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'ia-dashboard' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('ia-dashboard')}
+                    >
+                      <Bot size={16} /> IA Dashboard
+                    </button>
+                    <button
+                      className={`sidebar-item ${activeTab === 'notificacoes' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('notificacoes')}
+                    >
+                      <Bell size={16} /> Notificações
                     </button>
                     <button
                       className={`sidebar-item ${activeTab === 'config' ? 'active' : ''}`}

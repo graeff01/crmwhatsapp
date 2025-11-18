@@ -205,6 +205,67 @@ const api = {
     });
     return response.data;
   },
+
+  // =============================
+  // 📱 NOTIFICAÇÕES WHATSAPP GESTOR
+  // =============================
+  getGestorWhatsAppConfig: async () => {
+    const response = await axios.get(`${API_URL}/gestores/whatsapp-config`);
+    return response.data;
+  },
+
+  setGestorWhatsAppConfig: async (config) => {
+    const response = await axios.post(`${API_URL}/gestores/whatsapp-config`, config);
+    return response.data;
+  },
+
+  testGestorWhatsApp: async () => {
+    const response = await axios.post(`${API_URL}/gestores/whatsapp-config/test`);
+    return response.data;
+  },
+
+  disableGestorWhatsApp: async () => {
+    const response = await axios.delete(`${API_URL}/gestores/whatsapp-config`);
+    return response.data;
+  },
+
+  getGestorStats: async () => {
+    const response = await axios.get(`${API_URL}/gestores/stats`);
+    return response.data;
+  },
+
+  // =============================
+  // 🤖 IA DASHBOARD
+  // =============================
+  getAIStats: async () => {
+    const response = await axios.get(`${API_URL}/ai/stats`);
+    return response.data;
+  },
+
+  getAIActiveConversations: async () => {
+    const response = await axios.get(`${API_URL}/ai/conversations/active`);
+    return response.data;
+  },
+
+  getAIConversation: async (phone) => {
+    const response = await axios.get(`${API_URL}/ai/conversations/${phone}`);
+    return response.data;
+  },
+
+  escalateAIConversation: async (phone) => {
+    const response = await axios.post(`${API_URL}/ai/conversations/${phone}/escalate`);
+    return response.data;
+  },
+
+  endAIConversation: async (phone, reason = 'Manual') => {
+    const response = await axios.post(`${API_URL}/ai/conversations/${phone}/end`, { reason });
+    return response.data;
+  },
+
+  getAIPerformance: async () => {
+    const response = await axios.get(`${API_URL}/ai/performance`);
+    return response.data;
+  },
 };
 
 
