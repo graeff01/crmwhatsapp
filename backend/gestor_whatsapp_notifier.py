@@ -5,9 +5,10 @@ Envia alertas automáticos via WhatsApp quando detecta problemas críticos
 
 from datetime import datetime
 from typing import List, Dict, Any
-from logger import get_logger, audit_logger
+from logger import get_logger, get_audit_logger
 
 logger = get_logger('gestor_notifier')
+audit_logger = get_audit_logger()
 
 
 class GestorWhatsAppNotifier:
