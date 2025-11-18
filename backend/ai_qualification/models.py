@@ -17,6 +17,14 @@ class QualificationStatus(Enum):
 
 
 @dataclass
+class QualificationCriteria:
+    """Critérios para qualificação de leads"""
+    required_fields: List[str] = field(default_factory=lambda: ["name", "phone", "interest"])
+    min_score: int = 50
+    max_attempts: int = 5
+
+
+@dataclass
 class Message:
     """Representa uma mensagem na conversa"""
     role: str  # 'user' ou 'assistant'

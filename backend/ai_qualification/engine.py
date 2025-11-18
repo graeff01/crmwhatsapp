@@ -3,7 +3,8 @@ Regras de negócio para qualificação de leads
 Centraliza lógica de decisão e scoring
 """
 from typing import Dict, List, Optional
-from ai_qualification.models import LeadConversation, QualificationStatus
+from datetime import datetime
+from ai_qualification.models import LeadConversation, QualificationStatus, QualificationCriteria, Message
 
 
 class QualificationRules:
@@ -62,7 +63,7 @@ class QualificationRules:
         
         # 2. Engajamento (30 pontos)
         # Baseado no número de mensagens do usuário
-        user_messages = [m for m in conversation.messages if m.role.value == "user"]
+        user_messages = [m for m in conversation.messages if m.role == "user"]
         engagement = min(len(user_messages) / 5, 1.0)  # 5 mensagens = 100%
         score += int(engagement * 30)
         
@@ -90,7 +91,7 @@ class QualificationRules:
         urgency_points = 0
         
         for message in conversation.messages:
-            if message.role.value == "user":
+            if message.role == "user":
                 content_lower = message.content.lower()
                 for keyword, points in QualificationRules.URGENCY_KEYWORDS.items():
                     if keyword in content_lower:
@@ -141,7 +142,7 @@ class QualificationRules:
         """Verifica se o lead deve ser desqualificado"""
         # Verifica palavras-chave de desqualificação
         for message in conversation.messages:
-            if message.role.value == "user":
+            if message.role == "user":
                 content_lower = message.content.lower()
                 if any(keyword in content_lower for keyword in QualificationRules.DISQUALIFICATION_KEYWORDS):
                     return True
@@ -159,7 +160,7 @@ class QualificationRules:
         # Cliente pede explicitamente
         keywords_human = ["falar com pessoa", "atendente", "humano", "pessoa real"]
         for message in conversation.messages:
-            if message.role.value == "user":
+            if message.role == "user":
                 content_lower = message.content.lower()
                 if any(keyword in content_lower for keyword in keywords_human):
                     return True
@@ -214,7 +215,7 @@ class QualificationRules:
             tags.append("urgent")
         
         # Tags por palavras-chave
-        all_text = " ".join([m.content.lower() for m in conversation.messages if m.role.value == "user"])
+        all_text = " ".join([m.content.lower() for m in conversation.messages if m.role == "user"])
         
         keyword_tags = {
             "orçamento": "budget_request",
@@ -256,9 +257,263 @@ class QualificationRules:
                 summary_parts.append(f"• {note}")
         
         # Contexto da conversa
-        user_messages = [m.content for m in conversation.messages if m.role.value == "user"]
+        user_messages = [m.content for m in conversation.messages if m.role == "user"]
         if user_messages:
             summary_parts.append(f"\nMensagens do cliente: {len(user_messages)}")
             summary_parts.append(f"Primeira mensagem: \"{user_messages[0][:100]}...\"")
-        
+
         return "\n".join(summary_parts)
+
+
+class QualificationEngine:
+    """
+    Motor de qualificação de leads usando IA
+    Orquestra conversas, aplica regras e gerencia estado
+    """
+
+    def __init__(self, ai_provider, business_type: str = "default",
+                 qualification_criteria: Optional[QualificationCriteria] = None):
+        """
+        Inicializa o motor de qualificação
+
+        Args:
+            ai_provider: Provider de IA (OpenAI, Anthropic, etc)
+            business_type: Tipo de negócio para regras específicas
+            qualification_criteria: Critérios de qualificação personalizados
+        """
+        self.ai_provider = ai_provider
+        self.business_type = business_type
+        self.criteria = qualification_criteria or QualificationCriteria()
+        self.active_conversations: Dict[str, LeadConversation] = {}
+        self.completed_conversations: List[LeadConversation] = []
+
+    async def process_message(self, phone: str, message: str, metadata: Dict = None) -> Dict:
+        """
+        Processa mensagem de um lead
+
+        Args:
+            phone: Telefone do lead
+            message: Mensagem recebida
+            metadata: Metadados adicionais
+
+        Returns:
+            Dict com status, resposta e dados para CRM
+        """
+        metadata = metadata or {}
+
+        # Obtém ou cria conversa
+        conversation = self.get_or_create_conversation(phone, metadata)
+
+        # Adiciona mensagem do usuário
+        conversation.add_message("user", message)
+        conversation.increment_attempts()
+
+        # Verifica se deve desqualificar
+        if QualificationRules.should_disqualify(conversation):
+            conversation.status = QualificationStatus.DISQUALIFIED
+            response = "Obrigado pelo contato. No momento não conseguimos prosseguir com seu atendimento."
+            self.end_conversation(phone, "Desqualificado")
+            return {
+                "status": "disqualified",
+                "response": response,
+                "should_send_to_crm": False
+            }
+
+        # Verifica se deve escalar para humano
+        if QualificationRules.should_escalate_to_human(conversation):
+            return await self._handle_escalation(conversation)
+
+        # Processa com IA
+        ai_response = await self._get_ai_response(conversation, message)
+
+        # Adiciona resposta da IA
+        conversation.add_message("assistant", ai_response["response"])
+
+        # Extrai dados estruturados da resposta da IA
+        if ai_response.get("collected_data"):
+            for key, value in ai_response["collected_data"].items():
+                conversation.collect_data(key, value)
+
+        # Atualiza score
+        conversation.score = QualificationRules.calculate_lead_score(conversation)
+
+        # Verifica se está qualificado
+        if QualificationRules.should_qualify(conversation, self.business_type):
+            conversation.status = QualificationStatus.QUALIFIED
+            return {
+                "status": "qualified",
+                "response": ai_response["response"],
+                "should_send_to_crm": True,
+                "crm_data": self._prepare_crm_data(conversation)
+            }
+
+        # Conversa ainda em progresso
+        return {
+            "status": "in_progress",
+            "response": ai_response["response"],
+            "should_send_to_crm": False,
+            "score": conversation.score
+        }
+
+    async def _get_ai_response(self, conversation: LeadConversation, message: str) -> Dict:
+        """
+        Obtém resposta da IA
+
+        Args:
+            conversation: Conversa atual
+            message: Mensagem do usuário
+
+        Returns:
+            Dict com resposta e dados coletados
+        """
+        # Prepara contexto para IA
+        system_prompt = self._build_system_prompt(conversation)
+        conversation_history = [
+            {"role": m.role, "content": m.content}
+            for m in conversation.messages[-10:]  # Últimas 10 mensagens
+        ]
+
+        # Chama provider de IA
+        ai_response = await self.ai_provider.generate_response(
+            system_prompt=system_prompt,
+            messages=conversation_history
+        )
+
+        return {
+            "response": ai_response.get("message", "Desculpe, não entendi. Pode reformular?"),
+            "collected_data": ai_response.get("extracted_data", {})
+        }
+
+    def _build_system_prompt(self, conversation: LeadConversation) -> str:
+        """Constrói prompt de sistema para IA"""
+        missing_fields = [
+            field for field in self.criteria.required_fields
+            if field not in conversation.collected_data
+        ]
+
+        prompt = f"""Você é um assistente de qualificação de leads para um negócio tipo: {self.business_type}.
+
+Seu objetivo é coletar as seguintes informações de forma natural e amigável:
+{', '.join(self.criteria.required_fields)}
+
+Informações já coletadas: {list(conversation.collected_data.keys())}
+Ainda faltam: {missing_fields}
+
+Score atual do lead: {conversation.score}/100
+Tentativas: {conversation.attempts}/{self.criteria.max_attempts}
+
+Diretrizes:
+1. Seja amigável e profissional
+2. Faça UMA pergunta por vez
+3. Se o cliente demonstrar urgência, colete informações essenciais rapidamente
+4. Se o cliente pedir para falar com humano, indique que iremos transferir
+5. Extraia dados estruturados sempre que possível
+
+Responda de forma natural e objetiva."""
+
+        return prompt
+
+    async def _handle_escalation(self, conversation: LeadConversation) -> Dict:
+        """Escalação para atendimento humano"""
+        conversation.status = QualificationStatus.NEEDS_HUMAN
+        conversation.add_note("Escalado para atendimento humano")
+
+        response = """Entendo! Vou transferir você para um de nossos especialistas que poderá ajudá-lo melhor.
+Em breve um membro da nossa equipe entrará em contato. Obrigado pela paciência!"""
+
+        conversation.add_message("assistant", response)
+
+        return {
+            "status": "escalated",
+            "response": response,
+            "should_send_to_crm": True,
+            "crm_data": self._prepare_crm_data(conversation, escalated=True)
+        }
+
+    def _prepare_crm_data(self, conversation: LeadConversation, escalated: bool = False) -> Dict:
+        """Prepara dados para envio ao CRM"""
+        priority = QualificationRules.determine_priority(conversation)
+        tags = QualificationRules.suggest_tags(conversation)
+        summary = QualificationRules.generate_summary(conversation)
+
+        if escalated:
+            tags.append("escalated_from_ai")
+
+        return {
+            "phone": conversation.phone,
+            "name": conversation.collected_data.get("name", ""),
+            "collected_data": conversation.collected_data,
+            "score": conversation.score,
+            "priority": priority,
+            "tags": tags,
+            "summary": summary,
+            "conversation_history": [
+                {"role": m.role, "content": m.content, "timestamp": m.timestamp}
+                for m in conversation.messages
+            ],
+            "notes": conversation.notes,
+            "qualification_status": conversation.status.value
+        }
+
+    def get_or_create_conversation(self, phone: str, metadata: Dict = None) -> LeadConversation:
+        """Obtém conversa existente ou cria nova"""
+        if phone not in self.active_conversations:
+            conversation = LeadConversation(phone=phone)
+
+            # Adiciona informações de metadata
+            if metadata:
+                if "contact_name" in metadata:
+                    conversation.collect_data("name", metadata["contact_name"])
+
+            self.active_conversations[phone] = conversation
+
+        return self.active_conversations[phone]
+
+    def get_conversation(self, phone: str) -> Optional[LeadConversation]:
+        """Retorna conversa ativa ou None"""
+        return self.active_conversations.get(phone)
+
+    def end_conversation(self, phone: str, reason: str = "Completed"):
+        """Encerra uma conversa"""
+        if phone in self.active_conversations:
+            conversation = self.active_conversations[phone]
+            conversation.status = QualificationStatus.COMPLETED
+            conversation.add_note(f"Encerrado: {reason}")
+
+            # Move para conversas completas
+            self.completed_conversations.append(conversation)
+            del self.active_conversations[phone]
+
+    def get_stats(self) -> Dict:
+        """Retorna estatísticas do sistema"""
+        total_conversations = len(self.active_conversations) + len(self.completed_conversations)
+
+        qualified = sum(
+            1 for conv in self.completed_conversations
+            if conv.status == QualificationStatus.QUALIFIED
+        )
+
+        disqualified = sum(
+            1 for conv in self.completed_conversations
+            if conv.status == QualificationStatus.DISQUALIFIED
+        )
+
+        escalated = sum(
+            1 for conv in self.completed_conversations
+            if conv.status == QualificationStatus.NEEDS_HUMAN
+        )
+
+        avg_score = 0
+        if self.completed_conversations:
+            avg_score = sum(c.score for c in self.completed_conversations) / len(self.completed_conversations)
+
+        return {
+            "total_conversations": total_conversations,
+            "active_conversations": len(self.active_conversations),
+            "completed_conversations": len(self.completed_conversations),
+            "qualified_leads": qualified,
+            "disqualified_leads": disqualified,
+            "escalated_to_human": escalated,
+            "average_score": round(avg_score, 1),
+            "conversion_rate": (qualified / total_conversations * 100) if total_conversations > 0 else 0
+        }
