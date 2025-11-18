@@ -3,13 +3,14 @@ Blueprint de IA Dashboard
 Rotas para monitoramento e gestão do sistema de qualificação por IA
 """
 from flask import Blueprint, request, jsonify, session
-from auth_decorators import login_required, requires_role
+from auth_decorators import login_required, role_required
 from middlewares import rate_limit, handle_errors
-from logger import get_logger, audit_logger
+from logger import get_logger, get_audit_logger
 from datetime import datetime, timedelta
 
 ai_dashboard_bp = Blueprint('ai_dashboard', __name__, url_prefix='/api/ai')
 logger = get_logger('ai_dashboard')
+audit_logger = get_audit_logger()
 
 # Será injetado pelo app.py
 _db = None
@@ -25,7 +26,7 @@ def init_ai_dashboard_routes(db, ai_engine=None):
 
 @ai_dashboard_bp.route("/stats", methods=["GET"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_ai_stats():
     """Retorna estatísticas do sistema de IA"""
@@ -89,7 +90,7 @@ def get_ai_stats():
 
 @ai_dashboard_bp.route("/conversations/active", methods=["GET"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_active_conversations():
     """Retorna conversas ativas em andamento"""
@@ -160,7 +161,7 @@ def get_active_conversations():
 
 @ai_dashboard_bp.route("/conversations/<phone>", methods=["GET"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_conversation_details(phone):
     """Retorna detalhes completos de uma conversa"""
@@ -232,7 +233,7 @@ def get_conversation_details(phone):
 
 @ai_dashboard_bp.route("/conversations/<phone>/escalate", methods=["POST"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def escalate_conversation(phone):
     """Escala conversa para atendimento humano"""
@@ -290,7 +291,7 @@ def escalate_conversation(phone):
 
 @ai_dashboard_bp.route("/conversations/<phone>/end", methods=["POST"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def end_conversation(phone):
     """Encerra uma conversa"""
@@ -351,7 +352,7 @@ def end_conversation(phone):
 
 @ai_dashboard_bp.route("/performance", methods=["GET"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_ai_performance():
     """Retorna métricas de performance da IA nos últimos 7 dias"""

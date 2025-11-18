@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 """
 Base Provider para sistemas de IA
-Define interface padrão para diferentes providers (OpenAI, Anthropic, etc)
+Define interface padrao para diferentes providers (OpenAI, Anthropic, etc)
 """
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
@@ -17,9 +18,9 @@ class BaseAIProvider(ABC):
         Inicializa o provider
 
         Args:
-            api_key: Chave de API do serviço
+            api_key: Chave de API do servico
             model: Nome do modelo a ser usado
-            **kwargs: Configurações adicionais específicas do provider
+            **kwargs: Configuracoes adicionais especificas do provider
         """
         self.api_key = api_key
         self.model = model
@@ -38,13 +39,13 @@ class BaseAIProvider(ABC):
         Args:
             system_prompt: Prompt de sistema/contexto
             messages: Lista de mensagens da conversa [{"role": "user", "content": "..."}]
-            **kwargs: Parâmetros adicionais (temperature, max_tokens, etc)
+            **kwargs: Parametros adicionais (temperature, max_tokens, etc)
 
         Returns:
             Dict com:
                 - message: Resposta gerada
-                - extracted_data: Dados estruturados extraídos (opcional)
-                - metadata: Metadados da geração (tokens usados, etc)
+                - extracted_data: Dados estruturados extraidos (opcional)
+                - metadata: Metadados da geracao (tokens usados, etc)
         """
         pass
 
@@ -59,13 +60,13 @@ class BaseAIProvider(ABC):
 
         Args:
             text: Texto para extrair dados
-            schema: Schema dos dados a serem extraídos
+            schema: Schema dos dados a serem extraidos
 
         Returns:
-            Dict com dados extraídos
+            Dict com dados extraidos
         """
         pass
 
     def validate_api_key(self) -> bool:
-        """Valida se a API key está configurada"""
+        """Valida se a API key esta configurada"""
         return bool(self.api_key and len(self.api_key) > 0)

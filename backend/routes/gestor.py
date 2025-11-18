@@ -3,12 +3,14 @@ Blueprint de Configurações de Gestores
 Gerencia notificações WhatsApp e configurações de alertas para gestores
 """
 from flask import Blueprint, request, jsonify, session
-from auth_decorators import login_required, requires_role
+from auth_decorators import login_required, role_required
 from middlewares import rate_limit, validate_request, handle_errors
-from logger import get_logger, audit_logger
+from logger import get_logger, get_audit_logger
+
+logger = get_logger('gestor')
+audit_logger = get_audit_logger()
 
 gestor_bp = Blueprint('gestor', __name__, url_prefix='/api/gestores')
-logger = get_logger('gestor')
 
 # Será injetado pelo app.py
 _db = None
@@ -27,7 +29,7 @@ def init_gestor_routes(db, whatsapp, notifier):
 @gestor_bp.route("/whatsapp-config", methods=["GET"])
 @login_required
 @rate_limit('per_minute')
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_whatsapp_config():
     """Retorna configuração de WhatsApp do gestor"""
@@ -46,7 +48,7 @@ def get_whatsapp_config():
 @gestor_bp.route("/whatsapp-config", methods=["POST"])
 @login_required
 @rate_limit('per_minute')
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @validate_request('phone')
 @handle_errors
 def set_whatsapp_config():
@@ -102,7 +104,7 @@ def set_whatsapp_config():
 @gestor_bp.route("/whatsapp-config/test", methods=["POST"])
 @login_required
 @rate_limit('per_minute')
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def test_whatsapp():
     """Envia mensagem de teste para o gestor"""
@@ -129,7 +131,7 @@ def test_whatsapp():
 @gestor_bp.route("/whatsapp-config", methods=["DELETE"])
 @login_required
 @rate_limit('per_minute')
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def disable_whatsapp():
     """Desativa notificações WhatsApp"""
@@ -149,7 +151,7 @@ def disable_whatsapp():
 
 @gestor_bp.route("/stats", methods=["GET"])
 @login_required
-@requires_role("admin", "gestor")
+@role_required("admin", "gestor")
 @handle_errors
 def get_gestor_stats():
     """Retorna estatísticas gerais para gestores"""
