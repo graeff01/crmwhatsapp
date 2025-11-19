@@ -1,6 +1,6 @@
 /**
  * Dashboard de Monitoramento de Qualificação por IA
- * 
+ *
  * Exibe conversas ativas, estatísticas e permite intervenção manual
  */
 
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import api from '../api';
 import { toast } from './Toast';
+import '../styles/components/AIQualificationDashboard.css';
 
 const AIQualificationDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -79,50 +80,51 @@ const AIQualificationDashboard = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <div className="loading-text">Carregando dashboard...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="ai-dashboard">
+      <div className="ai-dashboard-container">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <MessageCircle className="w-8 h-8 text-blue-600" />
+        <div className="ai-dashboard-header">
+          <h1>
+            <MessageCircle size={32} />
             Qualificação Inteligente de Leads
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p>
             Monitoramento em tempo real do sistema de IA
           </p>
         </div>
 
         {/* KPIs */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="kpi-grid">
             <KPICard
-              icon={<Users className="w-6 h-6" />}
+              icon={<Users size={24} />}
               title="Total de Conversas"
               value={stats.total_conversations}
               color="blue"
             />
             <KPICard
-              icon={<CheckCircle className="w-6 h-6" />}
+              icon={<CheckCircle size={24} />}
               title="Leads Qualificados"
               value={stats.qualified_leads}
               subtitle={`${stats.conversion_rate?.toFixed(1)}% conversão`}
               color="green"
             />
             <KPICard
-              icon={<AlertCircle className="w-6 h-6" />}
+              icon={<AlertCircle size={24} />}
               title="Escalados"
               value={stats.escalated_to_human}
               color="orange"
             />
             <KPICard
-              icon={<Clock className="w-6 h-6" />}
+              icon={<Clock size={24} />}
               title="Em Andamento"
               value={stats.active_conversations}
               color="purple"
@@ -131,17 +133,18 @@ const AIQualificationDashboard = () => {
         )}
 
         {/* Conversas Ativas */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-              <MessageCircle className="w-5 h-5" />
-              Conversas Ativas ({activeConversations.length})
+        <div className="conversations-section">
+          <div className="conversations-header">
+            <h2>
+              <MessageCircle size={20} />
+              Conversas Ativas
+              <span className="conversations-count">{activeConversations.length}</span>
             </h2>
           </div>
 
-          <div className="divide-y divide-gray-200">
+          <div className="conversations-list">
             {activeConversations.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
+              <div className="conversations-empty">
                 Nenhuma conversa ativa no momento
               </div>
             ) : (
@@ -172,22 +175,15 @@ const AIQualificationDashboard = () => {
 
 // Componente de KPI Card
 const KPICard = ({ icon, title, value, subtitle, color }) => {
-  const colorClasses = {
-    blue: 'bg-blue-50 text-blue-600',
-    green: 'bg-green-50 text-green-600',
-    orange: 'bg-orange-50 text-orange-600',
-    purple: 'bg-purple-50 text-purple-600'
-  };
-
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div className={`inline-flex p-3 rounded-lg ${colorClasses[color]} mb-4`}>
+    <div className="kpi-card">
+      <div className={`kpi-icon-wrapper ${color}`}>
         {icon}
       </div>
-      <div className="text-2xl font-bold text-gray-900">{value}</div>
-      <div className="text-sm text-gray-600 mt-1">{title}</div>
+      <div className="kpi-value">{value}</div>
+      <div className="kpi-title">{title}</div>
       {subtitle && (
-        <div className="text-xs text-gray-500 mt-1">{subtitle}</div>
+        <div className="kpi-subtitle">{subtitle}</div>
       )}
     </div>
   );
@@ -195,50 +191,48 @@ const KPICard = ({ icon, title, value, subtitle, color }) => {
 
 // Componente de Card de Conversa
 const ConversationCard = ({ conversation, onView, onEscalate, onEnd }) => {
-  const getScoreColor = (score) => {
-    if (score >= 70) return 'text-green-600 bg-green-50';
-    if (score >= 50) return 'text-yellow-600 bg-yellow-50';
-    return 'text-red-600 bg-red-50';
+  const getScoreClass = (score) => {
+    if (score >= 70) return 'high';
+    if (score >= 50) return 'medium';
+    return 'low';
   };
 
   const getStatusBadge = (status) => {
     const badges = {
-      in_progress: { text: 'Em Progresso', color: 'blue' },
-      qualified: { text: 'Qualificado', color: 'green' },
-      disqualified: { text: 'Desqualificado', color: 'red' },
-      needs_human: { text: 'Precisa Humano', color: 'orange' }
+      in_progress: { text: 'Em Progresso', class: 'in-progress' },
+      qualified: { text: 'Qualificado', class: 'qualified' },
+      disqualified: { text: 'Desqualificado', class: 'disqualified' },
+      needs_human: { text: 'Precisa Humano', class: 'needs-human' }
     };
 
     const badge = badges[status] || badges.in_progress;
     return (
-      <span className={`px-2 py-1 text-xs font-medium rounded-full bg-${badge.color}-50 text-${badge.color}-700`}>
+      <span className={`status-badge ${badge.class}`}>
         {badge.text}
       </span>
     );
   };
 
   return (
-    <div className="p-6 hover:bg-gray-50 transition-colors">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-start gap-4">
-          <div className="bg-blue-100 p-3 rounded-full">
-            <Phone className="w-5 h-5 text-blue-600" />
+    <div className="conversation-card">
+      <div className="conversation-card-header">
+        <div className="conversation-contact">
+          <div className="conversation-avatar">
+            <Phone size={20} />
           </div>
-          <div>
-            <div className="font-semibold text-gray-900">
-              {conversation.collected_data?.name || 'Nome não coletado'}
-            </div>
-            <div className="text-sm text-gray-600">{conversation.phone}</div>
-            <div className="flex items-center gap-2 mt-2">
+          <div className="conversation-info">
+            <h3>{conversation.collected_data?.name || 'Nome não coletado'}</h3>
+            <div className="conversation-phone">{conversation.phone}</div>
+            <div className="conversation-badges">
               {getStatusBadge(conversation.status)}
-              <span className={`px-2 py-1 text-xs font-medium rounded-full ${getScoreColor(conversation.score)}`}>
+              <span className={`score-badge ${getScoreClass(conversation.score)}`}>
                 Score: {conversation.score}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="text-right text-sm text-gray-500">
+        <div className="conversation-meta">
           <div>{conversation.messages_count} mensagens</div>
           <div>{conversation.attempts} tentativas</div>
         </div>
@@ -246,13 +240,13 @@ const ConversationCard = ({ conversation, onView, onEscalate, onEnd }) => {
 
       {/* Dados Coletados */}
       {Object.keys(conversation.collected_data || {}).length > 0 && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-          <div className="text-xs font-medium text-gray-700 mb-2">Dados Coletados:</div>
-          <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+        <div className="collected-data">
+          <div className="collected-data-title">Dados Coletados:</div>
+          <div className="collected-data-grid">
             {Object.entries(conversation.collected_data).map(([key, value]) => (
               value && (
-                <div key={key}>
-                  <span className="font-medium">{key}:</span> {value}
+                <div key={key} className="collected-data-item">
+                  <span className="collected-data-key">{key}:</span> {value}
                 </div>
               )
             ))}
@@ -261,23 +255,14 @@ const ConversationCard = ({ conversation, onView, onEscalate, onEnd }) => {
       )}
 
       {/* Ações */}
-      <div className="flex gap-2">
-        <button
-          onClick={onView}
-          className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-        >
+      <div className="conversation-actions">
+        <button onClick={onView} className="action-btn view">
           Ver Detalhes
         </button>
-        <button
-          onClick={onEscalate}
-          className="px-4 py-2 text-sm font-medium text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-        >
+        <button onClick={onEscalate} className="action-btn escalate">
           Escalar
         </button>
-        <button
-          onClick={onEnd}
-          className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-        >
+        <button onClick={onEnd} className="action-btn end">
           Encerrar
         </button>
       </div>
@@ -288,38 +273,29 @@ const ConversationCard = ({ conversation, onView, onEscalate, onEnd }) => {
 // Modal de Detalhes da Conversa
 const ConversationModal = ({ conversation, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold">Detalhes da Conversa</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          </div>
+    <div className="conversation-modal-overlay">
+      <div className="conversation-modal">
+        <div className="modal-header">
+          <h3>Detalhes da Conversa</h3>
+          <button onClick={onClose} className="modal-close-btn">
+            ✕
+          </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="modal-content">
           {/* Histórico de Mensagens */}
-          <div>
-            <h4 className="font-medium text-gray-900 mb-3">Histórico</h4>
-            <div className="space-y-3">
+          <div className="modal-section">
+            <h4>Histórico</h4>
+            <div className="messages-history">
               {conversation.messages?.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`p-3 rounded-lg ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-50 ml-8' 
-                      : 'bg-gray-50 mr-8'
-                  }`}
+                  className={`message-bubble ${msg.role === 'user' ? 'user' : 'assistant'}`}
                 >
-                  <div className="text-xs text-gray-500 mb-1">
+                  <div className="message-header">
                     {msg.role === 'user' ? '👤 Cliente' : '🤖 IA'} • {new Date(msg.timestamp).toLocaleTimeString()}
                   </div>
-                  <div className="text-sm text-gray-700">{msg.content}</div>
+                  <div className="message-content">{msg.content}</div>
                 </div>
               ))}
             </div>
@@ -327,12 +303,14 @@ const ConversationModal = ({ conversation, onClose }) => {
 
           {/* Notas */}
           {conversation.notes && conversation.notes.length > 0 && (
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Notas</h4>
-              <div className="bg-yellow-50 p-3 rounded-lg space-y-1">
-                {conversation.notes.map((note, idx) => (
-                  <div key={idx} className="text-xs text-gray-600">• {note}</div>
-                ))}
+            <div className="modal-section">
+              <h4>Notas</h4>
+              <div className="notes-container">
+                <div className="notes-list">
+                  {conversation.notes.map((note, idx) => (
+                    <div key={idx} className="note-item">{note}</div>
+                  ))}
+                </div>
               </div>
             </div>
           )}

@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Bell, Phone, Check, X, AlertCircle, Send } from 'lucide-react';
 import { toast } from './Toast';
 import api from '../api';
+import '../styles/components/GestorNotifications.css';
 
 export default function GestorNotifications({ currentUser }) {
   const [loading, setLoading] = useState(true);
